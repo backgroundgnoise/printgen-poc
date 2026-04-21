@@ -853,8 +853,8 @@ async function generateImage() {
   statusEl.textContent = 'Lähetetään pyyntö Flux Dev -mallille...';
 
   const dtfPrompt = prompt + ', transparent background, isolated on white, high contrast, sharp edges, DTF print ready, no background';
-
-  try {
+  
+try {
     const response = await fetch(
       'https://hf-proxy-poc.bgnoiseandthecubicles.workers.dev',
       {
@@ -863,16 +863,14 @@ async function generateImage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          inputs: dtfPrompt,
-          parameters: {
-            width: 1024,
-            height: 1024,
-            num_inference_steps: 28,
-            guidance_scale: 3.5,
-          }
+          prompt: dtfPrompt,
+          num_inference_steps: 4,
+          width: 1024,
+          height: 1024,
         })
       }
     );
+  
 
     if (response.status === 503) {
       statusEl.textContent = 'Malli käynnistyy (cold start) — odotetaan...';
