@@ -1050,6 +1050,15 @@ function updateCanvas() {
     ctx.restore();
   }
 
+// Halftone esikatselu
+  if (state.halftonePreview) {
+    const cellSize = parseInt(document.getElementById('halftoneCell').value);
+    const angle = parseInt(document.getElementById('halftoneAngle').value);
+    const htCanvas = applyHalftone(canvas, cellSize, angle);
+    ctx.clearRect(0, 0, w, h);
+    ctx.drawImage(htCanvas, 0, 0);
+  }
+  
   updateDPI(state.mainImage, sizeCm);
 }
 
