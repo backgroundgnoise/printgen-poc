@@ -1300,6 +1300,84 @@ function downloadCanvas(c, filename) {
   }, 'image/png');
 }
 
+// ===== HALFTONE =====
+function updateHalftoneVals() {
+  document.getElementById('halftoneCellVal').textContent = document.getElementById('halftoneCell').value + ' px';
+  document.getElementById('halftoneAngleVal').textContent = document.getElementById('halftoneAngle').value + '°';
+  if (state.halftonePreview) updateCanvas();
+}
+
+function toggleHalftone() {
+  state.halftonePreview = !state.halftonePreview;
+  document.getElementById('halftoneToggle').textContent = 'Halftone: ' + (state.halftonePreview ? 'ON' : 'OFF');
+  document.getElementById('halftoneToggle').style.borderColor = state.halftonePreview ? 'var(--green)' : '';
+  updateCanvas();
+}
+
+function applyHalftone(srcCanvas, cellSize, angleDeg) {
+  const w = srcCanvas.width;
+  const h = srcCanvas.height;
+  const angle = angleDeg * Math.PI / 180;
+
+  // Lue lähdepikseli
+  const src = document.createElement('canvas');
+  src.width = w; src.height = h;
+  const sctx = src.getContext('2d');
+  sctx.drawImage(srcCanvas, 0, 0);
+  const srcData = sctx.getImageData(0, 0, w, h).data;
+
+  // Tulostuscanvas
+  const out = document.createElement('canvas');
+  out.width = w; out.height = h;
+  const octx = out.getContext('2d');
+
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+
+  // Käy ruudukko läpi rotatoituina koordinaateissa
+  const step = cellSize;
+  const diagSize = Math.ceil(Math.sqrt(w * w + h * h));
+
+  for (let row = -diagSize; row < diagSize; row += step) {
+    for (let col = -diagSize; col < diagSize; col += step) {
+      // Ruudun keskipiste rotatoituina koordinaateissa
+      const cx = col + step / 2;
+      const cy = row + step / 2;
+
+      // Takaisin kuvakoordinaatteihin
+      const px = Math.round(cx * cos - cy * sin + w / 2);
+      const py = Math.round(cx * sin + cy * cos + h / 2);
+
+      if (px < 0 || py < 0 || px >= w || py >= h) continue;
+
+      const i = (py * w + px) * 4;
+      const r = srcData[i];
+      const g = srcData[i + 1];
+      const b = srcData[i + 2];
+      const a = srcData[i + 3];
+
+      if (a < 10) continue;
+
+      // Kirkkaus → pisteen säde
+      const brightness = (r * 0.299 + g * 0.587 + b * 0.114) / 255;
+      const radius = (1 - brightness) * (step / 2) * 0.95;
+
+      if (radius < 0.5) continue;
+
+      // Piirrä piste alkuperäisellä värillä
+      octx.beginPath();
+      octx.arc(
+        cx * cos - cy * sin + w / 2,
+        cx * sin + cy * cos + h / 2,
+        radius, 0, Math.PI * 2
+      );
+      octx.fillStyle = `rgba(${r},${g},${b},${a / 255})`;
+      octx.fill();
+    }
+  }
+  return out;
+}
+  
 // ===== UTILS =====
 function setApiStatus(s) {
   const dot = document.getElementById('apiDot');
