@@ -863,10 +863,12 @@ try {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          prompt: dtfPrompt,
-          num_inference_steps: 4,
-          width: 1024,
-          height: 1024,
+          inputs: dtfPrompt,
+          parameters: {
+           width: 1024,
+           height: 1024,
+           num_inference_steps: 4,
+          }
         })
       }
     );
