@@ -1222,7 +1222,13 @@ function exportFiles() {
     cc.drawImage(state.logoImage, -lw/2, -lh/2, lw, lh);
     cc.restore();
   }
-  downloadCanvas(colorCanvas, 'printgen_kuva.png');
+  
+const halftoneCell = parseInt(document.getElementById('halftoneCell').value);
+const halftoneAngle = parseInt(document.getElementById('halftoneAngle').value);
+const exportCanvas = state.halftonePreview
+  ? applyHalftone(colorCanvas, halftoneCell, halftoneAngle)
+  : colorCanvas;
+downloadCanvas(exportCanvas, 'printgen_kuva.png');
 
   // WHITE BASE FILE
   setTimeout(() => {
