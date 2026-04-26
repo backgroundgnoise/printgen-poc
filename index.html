@@ -1,0 +1,3402 @@
+<!DOCTYPE html>
+<html lang="fi">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Printgen v3 — DTF-työkalu</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap');
+
+    :root {
+      --bg: #0f0f0f;
+      --surface: #171717;
+      --surface2: #1f1f1f;
+      --surface3: #272727;
+      --border: #2e2e2e;
+      --border2: #3a3a3a;
+      --text: #f0ede8;
+      --text2: #9e9b96;
+      --text3: #5a5855;
+      --accent: #e8d5a3;
+      --accent2: #c4a96b;
+      --green: #4ade80;
+      --green-dim: #1a3d2b;
+      --red: #f87171;
+      --red-dim: #3d1a1a;
+      --yellow: #fbbf24;
+      --yellow-dim: #3d2e0a;
+      --blue: #60a5fa;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* TOP BAR */
+    .topbar {
+      height: 48px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      gap: 16px;
+      flex-shrink: 0;
+      background: var(--surface);
+    }
+
+    .logo {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 16px;
+      letter-spacing: -0.02em;
+      color: var(--accent);
+    }
+
+    .logo span {
+      color: var(--text3);
+      font-weight: 400;
+      font-size: 12px;
+      margin-left: 6px;
+      font-family: 'DM Mono', monospace;
+    }
+
+    .topbar-spacer {
+      flex: 1;
+    }
+
+    /* VIEW TOGGLE */
+    .view-toggle {
+      display: flex;
+      gap: 2px;
+      background: var(--surface3);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 2px;
+    }
+
+    .view-btn {
+      padding: 4px 12px;
+      font-size: 11px;
+      font-family: 'DM Mono', monospace;
+      border-radius: 4px;
+      cursor: pointer;
+      color: var(--text3);
+      transition: all 0.15s;
+      border: none;
+      background: transparent;
+    }
+
+    .view-btn.active {
+      background: var(--surface);
+      color: var(--text);
+    }
+
+    .api-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text3);
+      font-family: 'DM Mono', monospace;
+    }
+
+    .api-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+    }
+
+    /* MAIN LAYOUT */
+    .main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 300px 1fr 280px;
+      overflow: hidden;
+    }
+
+    /* PANELS */
+    .panel {
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    .panel:last-child {
+      border-right: none;
+      border-left: 1px solid var(--border);
+    }
+
+    /* Panel visibility by view mode */
+    .panel-left {
+      transition: opacity 0.2s;
+    }
+
+    .panel-right {
+      transition: opacity 0.2s;
+    }
+
+    body.view-editor .panel-right {
+      opacity: 0.4;
+      pointer-events: none;
+    }
+
+    body.view-layout .panel-left {
+      opacity: 0.4;
+      pointer-events: none;
+    }
+
+    .panel-section {
+      border-bottom: 1px solid var(--border);
+      padding: 14px 16px;
+    }
+
+    .panel-section:last-child {
+      border-bottom: none;
+    }
+
+    .section-title {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text3);
+      margin-bottom: 10px;
+    }
+
+    /* Inside collapsible headers, no bottom margin needed */
+    .section-header .section-title {
+      margin-bottom: 0;
+    }
+
+    .section-step {
+      font-family: 'DM Mono', monospace;
+      font-size: 9px;
+      color: var(--accent2);
+      letter-spacing: 0.08em;
+      margin-bottom: 2px;
+    }
+
+    /* CANVAS AREA */
+    .canvas-area {
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .canvas-wrap {
+      position: relative;
+    }
+
+    #mainCanvas {
+      display: block;
+      cursor: crosshair;
+    }
+
+    .canvas-label {
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      color: var(--text3);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 4px 10px;
+      border-radius: 4px;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    /* FORM ELEMENTS */
+    label {
+      display: block;
+      font-size: 12px;
+      color: var(--text2);
+      margin-bottom: 5px;
+    }
+
+    input[type=text],
+    textarea {
+      width: 100%;
+      background: var(--surface3);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      outline: none;
+      resize: none;
+      transition: border-color 0.15s;
+    }
+
+    input[type=text]:focus,
+    textarea:focus {
+      border-color: var(--border2);
+    }
+
+    textarea {
+      height: 72px;
+      line-height: 1.5;
+    }
+
+    input[type=range] {
+      width: 100%;
+      accent-color: var(--accent);
+      height: 4px;
+      margin: 4px 0;
+    }
+
+    /* BUTTONS */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      padding: 8px 14px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #1a1500;
+      width: 100%;
+    }
+
+    .btn-primary:hover {
+      background: #f0e0b0;
+    }
+
+    .btn-primary:disabled {
+      background: var(--surface3);
+      color: var(--text3);
+      cursor: not-allowed;
+    }
+
+    .btn-secondary {
+      background: var(--surface3);
+      color: var(--text2);
+      border: 1px solid var(--border);
+      width: 100%;
+    }
+
+    .btn-secondary:hover {
+      background: var(--surface2);
+      color: var(--text);
+      border-color: var(--border2);
+    }
+
+    .btn-icon {
+      background: var(--surface3);
+      color: var(--text2);
+      border: 1px solid var(--border);
+      padding: 7px 10px;
+      font-size: 14px;
+    }
+
+    .btn-icon:hover {
+      color: var(--text);
+      border-color: var(--border2);
+    }
+
+    .btn-danger {
+      background: var(--red-dim);
+      color: var(--red);
+      border: 1px solid #5a2020;
+    }
+
+    .btn-export {
+      background: var(--green-dim);
+      color: var(--green);
+      border: 1px solid #1f5a35;
+      width: 100%;
+    }
+
+    .btn-export:hover {
+      background: #1f4a2e;
+    }
+
+    .btn-export:disabled {
+      background: var(--surface3);
+      color: var(--text3);
+      border-color: var(--border);
+      cursor: not-allowed;
+    }
+
+    .btn-upscale {
+      background: #1a2a3d;
+      color: var(--blue);
+      border: 1px solid #1f3a5a;
+      width: 100%;
+    }
+
+    .btn-upscale:hover {
+      background: #1f3050;
+    }
+
+    .btn-upscale:disabled {
+      background: var(--surface3);
+      color: var(--text3);
+      border-color: var(--border);
+      cursor: not-allowed;
+    }
+
+    /* STATUS / BADGE */
+    .badge {
+      display: inline-block;
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      padding: 2px 7px;
+      border-radius: 3px;
+      font-weight: 500;
+    }
+
+    .badge-green {
+      background: var(--green-dim);
+      color: var(--green);
+    }
+
+    .badge-yellow {
+      background: var(--yellow-dim);
+      color: var(--yellow);
+    }
+
+    .badge-red {
+      background: var(--red-dim);
+      color: var(--red);
+    }
+
+    .badge-blue {
+      background: #1a2a3d;
+      color: var(--blue);
+    }
+
+    /* DPI METER */
+    .dpi-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 6px;
+    }
+
+    .dpi-val {
+      font-family: 'DM Mono', monospace;
+      font-size: 22px;
+      font-weight: 500;
+    }
+
+    .dpi-val.good {
+      color: var(--green);
+    }
+
+    .dpi-val.ok {
+      color: var(--yellow);
+    }
+
+    .dpi-val.bad {
+      color: var(--red);
+    }
+
+    /* SHAPE PICKER */
+    .shape-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+    }
+
+    .shape-btn {
+      aspect-ratio: 1;
+      background: var(--surface3);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-size: 10px;
+      color: var(--text3);
+    }
+
+    .shape-btn:hover {
+      border-color: var(--border2);
+      color: var(--text2);
+    }
+
+    .shape-btn.active {
+      border-color: var(--accent2);
+      color: var(--accent);
+      background: #2a2410;
+    }
+
+    .shape-icon {
+      font-size: 18px;
+    }
+
+    /* LOGO SLIDER */
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .slider-label {
+      font-size: 11px;
+      color: var(--text3);
+      font-family: 'DM Mono', monospace;
+      white-space: nowrap;
+    }
+
+    /* TABS (input method) */
+    .tabs {
+      display: flex;
+      gap: 2px;
+      margin-bottom: 12px;
+      background: var(--surface3);
+      border-radius: 6px;
+      padding: 2px;
+    }
+
+    .tab {
+      flex: 1;
+      padding: 5px 8px;
+      text-align: center;
+      font-size: 12px;
+      cursor: pointer;
+      border-radius: 4px;
+      color: var(--text3);
+      transition: all 0.15s;
+      font-family: 'DM Mono', monospace;
+    }
+
+    .tab.active {
+      background: var(--surface);
+      color: var(--text);
+    }
+
+    /* DROP ZONE */
+    .dropzone {
+      border: 1px dashed var(--border2);
+      border-radius: 6px;
+      padding: 20px;
+      text-align: center;
+      color: var(--text3);
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+      position: relative;
+    }
+
+    .dropzone:hover,
+    .dropzone.drag-over {
+      border-color: var(--accent2);
+      color: var(--text2);
+      background: #1e1c14;
+    }
+
+    .dropzone input {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    .dropzone-icon {
+      font-size: 24px;
+      margin-bottom: 6px;
+    }
+
+    /* LOADING SPINNER */
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: inline-block;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* PROGRESS BAR */
+    .progress-wrap {
+      height: 3px;
+      background: var(--surface3);
+      border-radius: 2px;
+      margin-top: 8px;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 2px;
+      transition: width 0.3s;
+    }
+
+    /* SLIDERS with value display */
+    .range-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .range-val {
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      color: var(--accent);
+      min-width: 38px;
+      text-align: right;
+    }
+
+    /* SCROLLBAR */
+    ::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 2px;
+    }
+
+    /* TOAST */
+    .toast {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 12px;
+      color: var(--text);
+      z-index: 100;
+      opacity: 0;
+      transition: opacity 0.2s;
+      pointer-events: none;
+      font-family: 'DM Mono', monospace;
+    }
+
+    .toast.show {
+      opacity: 1;
+    }
+
+    /* COLOR SWATCH STRIP */
+    .swatch-row {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      margin-top: 6px;
+    }
+
+    .swatch {
+      width: 22px;
+      height: 22px;
+      border-radius: 4px;
+      border: 1.5px solid transparent;
+      cursor: pointer;
+      transition: border-color 0.12s;
+    }
+
+    .swatch.active {
+      border-color: var(--accent);
+    }
+
+    /* Shirt bg options */
+    .shirt-opts {
+      display: flex;
+      gap: 6px;
+    }
+
+    .shirt-opt {
+      flex: 1;
+      padding: 6px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      text-align: center;
+      font-size: 11px;
+      cursor: pointer;
+      color: var(--text3);
+      transition: all 0.12s;
+    }
+
+    .shirt-opt.active {
+      border-color: var(--accent2);
+      color: var(--accent);
+      background: #2a2410;
+    }
+
+    /* DIVIDER */
+    hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 0;
+    }
+
+    /* SMALL UTIL */
+    .row {
+      display: flex;
+      gap: 6px;
+    }
+
+    .col {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .mt4 {
+      margin-top: 4px;
+    }
+
+    .mt8 {
+      margin-top: 8px;
+    }
+
+    .flex-between {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* COLLAPSIBLE PANEL SECTIONS */
+    .panel-section {
+      border-bottom: 1px solid var(--border);
+      overflow: hidden;
+      transition: opacity 0.2s;
+    }
+
+    .panel-section.no-collapse {
+      padding: 14px 16px;
+    }
+
+    .panel-section.collapsed .section-body {
+      max-height: 0 !important;
+      padding-top: 0 !important;
+      padding-bottom: 0 !important;
+      overflow: hidden;
+    }
+
+    .panel-section.disabled-step {
+      opacity: 0.45;
+    }
+
+    .section-header {
+      padding: 12px 16px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      user-select: none;
+    }
+
+    .section-header-titles {
+      flex: 1;
+    }
+
+    .section-body {
+      padding: 2px 16px 14px;
+      max-height: 2000px;
+      transition: max-height 0.32s ease, padding 0.2s ease;
+      overflow: visible;
+    }
+
+    .collapse-indicator {
+      font-size: 11px;
+      color: var(--text3);
+      font-family: 'DM Mono', monospace;
+      margin-top: 1px;
+      flex-shrink: 0;
+      user-select: none;
+      transition: transform 0.2s;
+    }
+
+    .panel-section.collapsed .collapse-indicator {
+      transform: rotate(-90deg);
+    }
+
+    .disabled-badge {
+      display: none;
+      font-family: 'DM Mono', monospace;
+      font-size: 9px;
+      color: var(--text3);
+      background: var(--surface3);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 1px 6px;
+      margin-top: 2px;
+    }
+
+    .panel-section.disabled-step .disabled-badge {
+      display: inline-block;
+    }
+
+    .panel-section.disabled-step .section-step {
+      display: none;
+    }
+
+    /* ADMIN MODAL */
+    .admin-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+
+    .admin-modal-overlay.open {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .admin-modal {
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: 10px;
+      width: 420px;
+      max-height: 85vh;
+      overflow-y: auto;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+    }
+
+    .admin-modal-header {
+      padding: 18px 20px 14px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .admin-modal-title {
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 15px;
+      color: var(--text);
+    }
+
+    .admin-modal-subtitle {
+      font-size: 11px;
+      color: var(--text3);
+      font-family: 'DM Mono', monospace;
+      margin-top: 2px;
+    }
+
+    .admin-close {
+      background: none;
+      border: none;
+      color: var(--text3);
+      font-size: 18px;
+      cursor: pointer;
+      padding: 4px;
+      line-height: 1;
+      transition: color 0.15s;
+    }
+
+    .admin-close:hover {
+      color: var(--text);
+    }
+
+    .admin-modal-body {
+      padding: 16px 20px;
+    }
+
+    .admin-section-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text3);
+      margin-bottom: 10px;
+      margin-top: 16px;
+    }
+
+    .admin-section-label:first-child {
+      margin-top: 0;
+    }
+
+    /* TOGGLE ROWS */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 9px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .toggle-row:last-child {
+      border-bottom: none;
+    }
+
+    .toggle-info {
+      flex: 1;
+    }
+
+    .toggle-name {
+      font-size: 13px;
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    .toggle-desc {
+      font-size: 11px;
+      color: var(--text3);
+      margin-top: 2px;
+      font-family: 'DM Mono', monospace;
+    }
+
+    /* TOGGLE SWITCH */
+    .toggle-switch {
+      position: relative;
+      width: 36px;
+      height: 20px;
+      flex-shrink: 0;
+      margin-left: 12px;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+      position: absolute;
+    }
+
+    .toggle-track {
+      position: absolute;
+      inset: 0;
+      background: var(--surface3);
+      border: 1px solid var(--border2);
+      border-radius: 20px;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    .toggle-track::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--text3);
+      transition: transform 0.2s, background 0.2s;
+    }
+
+    .toggle-switch input:checked+.toggle-track {
+      background: var(--green-dim);
+      border-color: #2a6040;
+    }
+
+    .toggle-switch input:checked+.toggle-track::after {
+      transform: translateX(16px);
+      background: var(--green);
+    }
+
+    /* PRESET BUTTONS */
+    .preset-btn {
+      padding: 5px 4px;
+      font-size: 11px;
+      font-family: 'DM Mono', monospace;
+      background: var(--surface3);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      color: var(--text3);
+      cursor: pointer;
+      transition: all 0.12s;
+      text-align: center;
+    }
+
+    .preset-btn:hover {
+      color: var(--text2);
+      border-color: var(--border2);
+    }
+
+    .preset-btn.active {
+      background: #2a2410;
+      border-color: var(--accent2);
+      color: var(--accent);
+    }
+
+    /* COLOR PICKER INPUTS */
+    input[type=color] {
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+    input[type=color]::-webkit-color-swatch-wrapper {
+      padding: 2px;
+    }
+
+    input[type=color]::-webkit-color-swatch {
+      border: none;
+      border-radius: 2px;
+    }
+
+    /* ADMIN BUTTON in topbar */
+    .btn-admin {
+      background: var(--surface3);
+      color: var(--text3);
+      border: 1px solid var(--border);
+      padding: 5px 11px;
+      font-size: 11px;
+      font-family: 'DM Mono', monospace;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .btn-admin:hover {
+      color: var(--text);
+      border-color: var(--border2);
+    }
+
+    /* PRINT AREA INPUTS in admin modal */
+    .admin-inputs {
+      display: flex;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .admin-inputs>div {
+      flex: 1;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <span class="logo">Printgen <span>v3 · PoC</span></span>
+    <div class="topbar-spacer"></div>
+    <!-- View toggle piilotettu — hämmentävä UX, voidaan palauttaa tarvittaessa
+  <div class="view-toggle">
+    <button class="view-btn active" id="viewEditorBtn" onclick="setView('editor')">✏ Kuvaeditori</button>
+    <button class="view-btn" id="viewLayoutBtn" onclick="setView('layout')">🖼 Layout</button>
+  </div>
+  -->
+    <button class="btn-admin" onclick="openAdmin()">⚙ Admin</button>
+    <div class="api-status">
+      <div class="api-dot" id="apiDot"></div>
+      <span id="apiStatusText">HF API · valmis</span>
+    </div>
+  </div>
+
+  <!-- ADMIN MODAL -->
+  <div class="admin-modal-overlay" id="adminModalOverlay" onclick="closeAdminOnOverlay(event)">
+    <div class="admin-modal">
+      <div class="admin-modal-header">
+        <div>
+          <div class="admin-modal-title">Admin-asetukset</div>
+          <div class="admin-modal-subtitle">Hallitse näkyviä ominaisuuksia ja painoaluetta</div>
+        </div>
+        <button class="admin-close" onclick="closeAdmin()">✕</button>
+      </div>
+      <div class="admin-modal-body">
+
+        <div class="admin-section-label">Painoalue</div>
+        <div class="admin-inputs">
+          <div>
+            <label>Leveys (cm)</label>
+            <input type="text" id="adminW" value="30" style="padding:6px 8px" oninput="updateCanvas()">
+          </div>
+          <div>
+            <label>Korkeus (cm)</label>
+            <input type="text" id="adminH" value="36" style="padding:6px 8px" oninput="updateCanvas()">
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--text3);margin-top:6px;">Mitat päivittyvät esikatseluun reaaliajassa.
+        </div>
+
+        <div class="admin-section-label">Kuvaeditori — vaiheet</div>
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <div class="toggle-name">Upscale</div>
+            <div class="toggle-desc">Vaihe 2 · Resoluution suurennus</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="featureUpscale" checked onchange="applyFeatureToggles()">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <div class="toggle-name">Logo-ankkuri</div>
+            <div class="toggle-desc">Vaihe 3 · Logon composite-toiminto</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="featureLogo" checked onchange="applyFeatureToggles()">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <div class="toggle-name">Taustan poisto</div>
+            <div class="toggle-desc">Vaihe 4 · Eyedropper-työkalu</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="featureBgRemoval" checked onchange="applyFeatureToggles()">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <div class="toggle-name">Värisäädöt</div>
+            <div class="toggle-desc">Vaihe 4.5 · Presetit, säädöt, tritone</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="featureColorAdj" checked onchange="applyFeatureToggles()">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <div class="toggle-name">Rasterointi</div>
+            <div class="toggle-desc">Vaihe 5 · Halftone-efekti</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="featureHalftone" checked onchange="applyFeatureToggles()">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+
+        <div class="admin-section-label">Layout — vaiheet</div>
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <div class="toggle-name">Paitapohja</div>
+            <div class="toggle-desc">Vaihe 6 · Paidan väri ja esikatselu</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="featureShirt" checked onchange="applyFeatureToggles()">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <div class="toggle-row">
+          <div class="toggle-info">
+            <div class="toggle-name">Clip-maski</div>
+            <div class="toggle-desc">Vaihe 7b · Geometriset leikkausmuodot</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="featureClipmask" checked onchange="applyFeatureToggles()">
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- LEFT PANEL: Image editing steps 1–5 -->
+    <div class="panel panel-left">
+
+      <!-- STEP 1: INPUT -->
+      <div class="panel-section" id="section-source">
+        <div class="section-header">
+          <div class="section-header-titles">
+            <div class="section-step">VAIHE 1</div>
+            <div class="section-title" style="margin-bottom:0">Kuvan lähde</div>
+            <div class="disabled-badge">POIS KÄYTÖSTÄ</div>
+          </div>
+        </div>
+        <div class="section-body">
+          <div class="tabs">
+            <div class="tab active" id="tabText" onclick="switchTab('text')">Tekstiprompt</div>
+            <div class="tab" id="tabUpload" onclick="switchTab('upload')">Lataa kuva</div>
+          </div>
+
+          <!-- TEXT PROMPT -->
+          <div id="inputText">
+            <label>Kuvaus</label>
+            <textarea id="promptInput"
+              placeholder="esim: vintage rock band logo, bold typography, skull motif, black and white, high contrast, DTF print ready"></textarea>
+            <div class="mt8">
+              <label>Kategoria (lisää promptiin)</label>
+              <div class="swatch-row" id="categoryBtns">
+                <button class="btn btn-icon" style="font-size:11px;padding:4px 8px"
+                  onclick="addCategory('logo')">logo</button>
+                <button class="btn btn-icon" style="font-size:11px;padding:4px 8px"
+                  onclick="addCategory('vaakuna')">vaakuna</button>
+                <button class="btn btn-icon" style="font-size:11px;padding:4px 8px"
+                  onclick="addCategory('sarjakuva')">sarjakuva</button>
+                <button class="btn btn-icon" style="font-size:11px;padding:4px 8px"
+                  onclick="addCategory('luonto')">luonto</button>
+              </div>
+            </div>
+            <div class="mt8">
+              <button class="btn btn-primary" id="generateBtn" onclick="generateImage()">
+                <span id="genBtnContent">Generoi kuva</span>
+              </button>
+              <div class="progress-wrap" id="progressWrap" style="display:none">
+                <div class="progress-bar" id="progressBar" style="width:0%"></div>
+              </div>
+              <div style="font-size:11px;color:var(--text3);margin-top:6px;" id="genStatus"></div>
+            </div>
+          </div>
+
+          <!-- FILE UPLOAD -->
+          <div id="inputUpload" style="display:none">
+            <div class="dropzone" id="dropzone">
+              <input type="file" accept="image/*" id="fileInput" onchange="handleFileUpload(event)">
+              <div class="dropzone-icon">↑</div>
+              <div>Vedä kuva tähän tai klikkaa</div>
+              <div style="margin-top:4px;font-size:11px">PNG, JPG — max 10 MB</div>
+            </div>
+          </div>
+        </div><!-- end section-body -->
+      </div><!-- end section-source -->
+
+      <!-- STEP 2: UPSCALE -->
+      <div class="panel-section" id="section-upscale">
+        <div class="section-header">
+          <div class="section-header-titles">
+            <div class="section-step">VAIHE 2</div>
+            <div class="section-title" style="margin-bottom:0">Upscale</div>
+            <div class="disabled-badge">POIS KÄYTÖSTÄ</div>
+          </div>
+          <span class="collapse-indicator">▾</span>
+        </div>
+        <div class="section-body">
+          <div class="col">
+            <div style="font-size:11px;color:var(--text3);">Suurenna kuvan resoluutio ennen painoa. Suositellaan
+              generoitujen kuvien kanssa.</div>
+            <div>
+              <label>Kerroin</label>
+              <div class="tabs" style="margin-bottom:0">
+                <div class="tab active" id="upscale2x" onclick="setUpscaleMultiplier(2)">2×</div>
+                <div class="tab" id="upscale3x" onclick="setUpscaleMultiplier(3)">3×</div>
+                <div class="tab" id="upscale4x" onclick="setUpscaleMultiplier(4)">4×</div>
+              </div>
+            </div>
+            <div id="upscaleInfo" style="font-size:11px;color:var(--text3);">—</div>
+            <button class="btn btn-upscale" id="upscaleBtn" onclick="doUpscale()" disabled>
+              <span id="upscaleBtnContent">↑ Upscale kuva</span>
+            </button>
+          </div>
+        </div><!-- end section-body -->
+      </div><!-- end section-upscale -->
+
+      <!-- STEP 3: LOGO -->
+      <div class="panel-section" id="section-logo">
+        <div class="section-header">
+          <div class="section-header-titles">
+            <div class="section-step">VAIHE 3</div>
+            <div class="section-title" style="margin-bottom:0">Logo-ankkuri</div>
+            <div class="disabled-badge">POIS KÄYTÖSTÄ</div>
+          </div>
+          <span class="collapse-indicator">▾</span>
+        </div>
+        <div class="section-body">
+          <div class="dropzone" id="logoDropzone" style="padding:12px">
+            <input type="file" accept="image/*" id="logoInput" onchange="handleLogoUpload(event)">
+            <div style="font-size:12px">Lataa logo (ankkurielementti)</div>
+            <div style="font-size:11px;margin-top:2px">Compositetaan päälle</div>
+          </div>
+          <div id="logoControls" style="display:none" class="mt8 col">
+            <div class="flex-between">
+              <span style="font-size:12px;color:var(--text2)">Logo ladattu</span>
+              <button class="btn btn-icon btn-danger" style="font-size:11px;padding:3px 8px"
+                onclick="removeLogo()">Poista</button>
+            </div>
+            <!-- Logo BG removal by corner pixel -->
+            <div>
+              <label>Logon taustan poisto</label>
+              <div class="row">
+                <button class="btn btn-icon" id="logoBgBtn" onclick="removeLogoBg()" style="flex:1;font-size:11px">
+                  🎨 Poista tausta (reunapikseli)
+                </button>
+              </div>
+              <div style="font-size:11px;color:var(--text3);margin-top:4px;" id="logoBgDesc">Lukee kulmapikselin värin
+                ja poistaa sen alphakanavalla.</div>
+            </div>
+            <div>
+              <label>Logotyyli</label>
+              <div class="slider-row">
+                <span class="slider-label">Lukittu</span>
+                <input type="range" min="0" max="100" value="0" id="logoStrength"
+                  oninput="updateLogoStrength(this.value)">
+                <span class="slider-label">Vapaa</span>
+              </div>
+              <div style="font-size:11px;color:var(--text3);margin-top:4px;" id="logoStrengthDesc">AI ei muokkaa logoa —
+                compositetaan päälle sellaisenaan.</div>
+            </div>
+            <div>
+              <label>Logon koko</label>
+              <div class="range-row">
+                <input type="range" min="10" max="100" value="40" id="logoSize" oninput="updateCanvas()">
+                <span class="range-val" id="logoSizeVal">40%</span>
+              </div>
+            </div>
+          </div>
+        </div><!-- end section-body -->
+      </div><!-- end section-logo -->
+
+      <!-- STEP 4: BG REMOVAL -->
+      <div class="panel-section" id="section-bgremoval">
+        <div class="section-header">
+          <div class="section-header-titles">
+            <div class="section-step">VAIHE 4</div>
+            <div class="section-title" style="margin-bottom:0">Taustan poisto</div>
+            <div class="disabled-badge">POIS KÄYTÖSTÄ</div>
+          </div>
+          <span class="collapse-indicator">▾</span>
+        </div>
+        <div class="section-body">
+          <label>Toleranssi</label>
+          <div class="range-row">
+            <input type="range" min="5" max="80" value="30" id="tolerance" oninput="updateCanvas()">
+            <span class="range-val" id="toleranceVal">30</span>
+          </div>
+          <div class="mt8">
+            <label>Valitut taustavärit</label>
+            <div class="swatch-row" id="selectedColors"></div>
+            <div style="font-size:11px;color:var(--text3);margin-top:4px;">Klikkaa kuvaa eyedropper-tilassa</div>
+          </div>
+          <div class="mt8 row">
+            <button class="btn btn-icon" id="eyedropperBtn" onclick="toggleEyedropper()" title="Eyedropper">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path
+                  d="M20.71 5.63l-2.34-2.34a1 1 0 0 0-1.41 0l-3.12 3.12-1.5-1.5-1.41 1.41 1.5 1.5L3 17.25V21h3.75l9.63-9.63 1.5 1.5 1.41-1.41-1.5-1.5 3.12-3.12a1 1 0 0 0 0-1.41z" />
+              </svg>
+              Eyedropper
+            </button>
+            <button class="btn btn-icon" onclick="clearColors()">Tyhjennä</button>
+          </div>
+        </div><!-- end section-body -->
+      </div><!-- end section-bgremoval -->
+
+      <!-- STEP 4.5: COLOR ADJUSTMENTS -->
+      <div class="panel-section" id="section-coloradj">
+        <div class="section-header">
+          <div class="section-header-titles">
+            <div class="section-step">VAIHE 4.5</div>
+            <div class="section-title" style="margin-bottom:0">Värisäädöt</div>
+            <div class="disabled-badge">POIS KÄYTÖSTÄ</div>
+          </div>
+          <span class="collapse-indicator">▾</span>
+        </div>
+        <div class="section-body">
+
+          <!-- PRESETS -->
+          <div style="margin-bottom:12px;">
+            <label>Presetit</label>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;" id="colorPresets">
+              <button class="preset-btn active" data-preset="original" onclick="applyPreset('original')">Alkup.</button>
+              <button class="preset-btn" data-preset="bw" onclick="applyPreset('bw')">M&amp;V</button>
+              <button class="preset-btn" data-preset="sepia" onclick="applyPreset('sepia')">Sepia</button>
+              <button class="preset-btn" data-preset="hicontrast" onclick="applyPreset('hicontrast')">Hi-Con</button>
+              <button class="preset-btn" data-preset="cartoon" onclick="applyPreset('cartoon')">Cartoon</button>
+              <button class="preset-btn" data-preset="fade" onclick="applyPreset('fade')">Fade</button>
+              <button class="preset-btn" data-preset="duotone" onclick="applyPreset('duotone')">Duotone</button>
+              <button class="preset-btn" data-preset="warm" onclick="applyPreset('warm')">Warm</button>
+            </div>
+          </div>
+
+          <!-- BASIC SLIDERS -->
+          <div class="col" style="gap:8px;margin-bottom:12px;">
+            <div>
+              <div class="flex-between" style="margin-bottom:3px;">
+                <label style="margin-bottom:0">Kirkkaus</label>
+                <span class="range-val" id="brightnessVal">0</span>
+              </div>
+              <input type="range" min="-100" max="100" value="0" step="1" id="brightnessSlider"
+                oninput="updateColorAdj()">
+            </div>
+            <div>
+              <div class="flex-between" style="margin-bottom:3px;">
+                <label style="margin-bottom:0">Kontrasti</label>
+                <span class="range-val" id="contrastVal">0</span>
+              </div>
+              <input type="range" min="-100" max="100" value="0" step="1" id="contrastSlider"
+                oninput="updateColorAdj()">
+            </div>
+            <div>
+              <div class="flex-between" style="margin-bottom:3px;">
+                <label style="margin-bottom:0">Kylläisyys</label>
+                <span class="range-val" id="saturationVal">0</span>
+              </div>
+              <input type="range" min="-100" max="100" value="0" step="1" id="saturationSlider"
+                oninput="updateColorAdj()">
+            </div>
+            <div>
+              <div class="flex-between" style="margin-bottom:3px;">
+                <label style="margin-bottom:0">Lämpötila</label>
+                <span class="range-val" id="temperatureVal">0</span>
+              </div>
+              <input type="range" min="-100" max="100" value="0" step="1" id="temperatureSlider"
+                oninput="updateColorAdj()">
+            </div>
+          </div>
+          <button class="btn btn-secondary" onclick="resetColorAdj()" style="margin-bottom:12px;">Nollaa säädöt</button>
+
+          <!-- POSTERIZATION -->
+          <div style="margin-bottom:12px;">
+            <div class="flex-between" style="margin-bottom:3px;">
+              <label style="margin-bottom:0">Posterisaatio (värien määrä)</label>
+              <span class="range-val" id="posterizeVal">Ei käytössä</span>
+            </div>
+            <input type="range" min="0" max="32" value="0" step="1" id="posterizeSlider" oninput="updateColorAdj()">
+            <div style="font-size:11px;color:var(--text3);margin-top:3px;">0 = pois käytöstä · 2–32 = värien määrä</div>
+          </div>
+
+          <!-- TRITONE -->
+          <div>
+            <div class="flex-between" style="margin-bottom:8px;">
+              <label style="margin-bottom:0">Tritone</label>
+              <button class="btn btn-icon" id="tritoneToggleBtn" onclick="toggleTritone()"
+                style="font-size:11px;padding:3px 10px;">OFF</button>
+            </div>
+            <div id="tritoneControls" style="display:none;">
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
+                <div style="text-align:center;">
+                  <div style="font-size:10px;color:var(--text3);margin-bottom:4px;font-family:'DM Mono',monospace;">
+                    VARJOT</div>
+                  <input type="color" id="tritoneShadow" value="#1a1a2e" oninput="updateColorAdj()"
+                    style="width:100%;height:32px;border:1px solid var(--border);border-radius:4px;background:none;cursor:pointer;padding:2px;">
+                </div>
+                <div style="text-align:center;">
+                  <div style="font-size:10px;color:var(--text3);margin-bottom:4px;font-family:'DM Mono',monospace;">
+                    PUOLISÄVYT</div>
+                  <input type="color" id="tritoneMid" value="#e8844a" oninput="updateColorAdj()"
+                    style="width:100%;height:32px;border:1px solid var(--border);border-radius:4px;background:none;cursor:pointer;padding:2px;">
+                </div>
+                <div style="text-align:center;">
+                  <div style="font-size:10px;color:var(--text3);margin-bottom:4px;font-family:'DM Mono',monospace;">
+                    VALOT</div>
+                  <input type="color" id="tritoneHighlight" value="#fdf4dc" oninput="updateColorAdj()"
+                    style="width:100%;height:32px;border:1px solid var(--border);border-radius:4px;background:none;cursor:pointer;padding:2px;">
+                </div>
+              </div>
+              <div>
+                <div class="flex-between" style="margin-bottom:3px;">
+                  <label style="margin-bottom:0">Intensiteetti</label>
+                  <span class="range-val" id="tritoneStrengthVal">100%</span>
+                </div>
+                <input type="range" min="0" max="100" value="100" step="1" id="tritoneStrength"
+                  oninput="updateColorAdj()">
+              </div>
+            </div>
+          </div>
+
+        </div><!-- end section-body -->
+      </div><!-- end section-coloradj -->
+
+      <!-- STEP 5: HALFTONE -->
+      <div class="panel-section" id="section-halftone">
+        <div class="section-header">
+          <div class="section-header-titles">
+            <div class="section-step">VAIHE 5</div>
+            <div class="section-title" style="margin-bottom:0">Rasterointi</div>
+            <div class="disabled-badge">POIS KÄYTÖSTÄ</div>
+          </div>
+          <span class="collapse-indicator">▾</span>
+        </div>
+        <div class="section-body">
+          <div class="col">
+            <div>
+              <label>Halftone-esikatselu</label>
+              <button class="btn btn-secondary" id="halftoneToggle" onclick="toggleHalftone()">Halftone: OFF</button>
+            </div>
+            <div>
+              <label>Pistetiheys (cell size)</label>
+              <div class="range-row">
+                <input type="range" min="2" max="20" value="6" step="1" id="halftoneCell"
+                  oninput="updateHalftoneVals()">
+                <span class="range-val" id="halftoneCellVal">6 px</span>
+              </div>
+            </div>
+            <div>
+              <label>Kulma</label>
+              <div class="range-row">
+                <input type="range" min="0" max="90" value="45" step="1" id="halftoneAngle"
+                  oninput="updateHalftoneVals()">
+                <span class="range-val" id="halftoneAngleVal">45°</span>
+              </div>
+            </div>
+          </div>
+        </div><!-- end section-body -->
+      </div><!-- end section-halftone -->
+
+      <!-- DPI — always visible, no toggle -->
+      <div class="panel-section no-collapse">
+        <div class="section-title">Laatu</div>
+        <div class="dpi-row">
+          <span style="font-size:12px;color:var(--text2)">Efektiivinen DPI</span>
+          <div>
+            <span class="dpi-val good" id="dpiVal">—</span>
+            <span style="font-size:11px;color:var(--text3)"> dpi</span>
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--text3);margin-top:4px;" id="dpiDesc">Lataa kuva ensin</div>
+      </div>
+
+    </div>
+
+    <!-- CENTER: Canvas -->
+    <div class="canvas-area" id="canvasArea">
+      <div class="canvas-wrap">
+        <canvas id="mainCanvas" width="500" height="600"></canvas>
+        <div class="canvas-label" id="canvasLabel">Ei kuvaa — generoi tai lataa</div>
+      </div>
+      <div class="toast" id="toast"></div>
+    </div>
+
+    <!-- RIGHT PANEL: Layout steps 6–8 -->
+    <div class="panel panel-right">
+
+      <!-- STEP 6: SHIRT BACKGROUND -->
+      <div class="panel-section" id="section-shirt">
+        <div class="section-header">
+          <div class="section-header-titles">
+            <div class="section-step">VAIHE 6</div>
+            <div class="section-title" style="margin-bottom:0">Paitapohja</div>
+            <div class="disabled-badge">POIS KÄYTÖSTÄ</div>
+          </div>
+          <span class="collapse-indicator">▾</span>
+        </div>
+        <div class="section-body">
+          <div class="shirt-opts">
+            <div class="shirt-opt active" id="shirtLight" onclick="setShirtBg('light')">Vaalea</div>
+            <div class="shirt-opt" id="shirtDark" onclick="setShirtBg('dark')">Tumma</div>
+            <div class="shirt-opt" id="shirtNone" onclick="setShirtBg('none')">Ei</div>
+          </div>
+        </div><!-- end section-body -->
+      </div><!-- end section-shirt -->
+
+      <!-- STEP 7: PLACEMENT — always visible -->
+      <div class="panel-section no-collapse">
+        <div class="section-step">VAIHE 7</div>
+        <div class="section-title">Sijoittelu</div>
+        <div class="col">
+          <div>
+            <label>Koko (cm)</label>
+            <div class="range-row">
+              <input type="range" min="2" max="30" value="15" step="0.5" id="sizeSlider" oninput="updateCanvas()">
+              <span class="range-val" id="sizeVal">15 cm</span>
+            </div>
+          </div>
+          <div>
+            <label>Kierto</label>
+            <div class="range-row">
+              <input type="range" min="-180" max="180" value="0" step="1" id="rotSlider" oninput="updateCanvas()">
+              <span class="range-val" id="rotVal">0°</span>
+            </div>
+          </div>
+          <div>
+            <label>Sijainti X</label>
+            <div class="range-row">
+              <input type="range" min="0" max="100" value="50" step="1" id="posX" oninput="updateCanvas()">
+              <span class="range-val" id="posXVal">50%</span>
+            </div>
+          </div>
+          <div>
+            <label>Sijainti Y</label>
+            <div class="range-row">
+              <input type="range" min="0" max="100" value="45" step="1" id="posY" oninput="updateCanvas()">
+              <span class="range-val" id="posYVal">45%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 7b: SHAPE / CLIP MASK -->
+      <div class="panel-section" id="section-clipmask">
+        <div class="section-header">
+          <div class="section-header-titles">
+            <div class="section-step">VAIHE 7b</div>
+            <div class="section-title" style="margin-bottom:0">Muoto / Clip-maski</div>
+            <div class="disabled-badge">POIS KÄYTÖSTÄ</div>
+          </div>
+          <span class="collapse-indicator">▾</span>
+        </div>
+        <div class="section-body">
+          <div class="shape-grid">
+            <div class="shape-btn active" data-shape="none" onclick="setShape('none')">
+              <div class="shape-icon">▭</div>
+              <span>Vapaa</span>
+            </div>
+            <div class="shape-btn" data-shape="circle" onclick="setShape('circle')">
+              <div class="shape-icon">○</div>
+              <span>Ympyrä</span>
+            </div>
+            <div class="shape-btn" data-shape="rounded" onclick="setShape('rounded')">
+              <div class="shape-icon">▢</div>
+              <span>Pyöristetty</span>
+            </div>
+            <div class="shape-btn" data-shape="square" onclick="setShape('square')">
+              <div class="shape-icon">□</div>
+              <span>Neliö</span>
+            </div>
+            <div class="shape-btn" data-shape="ellipse" onclick="setShape('ellipse')">
+              <div class="shape-icon">⬭</div>
+              <span>Ellipsi</span>
+            </div>
+            <div class="shape-btn" data-shape="shield" onclick="setShape('shield')">
+              <div class="shape-icon">⬡</div>
+              <span>Kilpi</span>
+            </div>
+            <div class="shape-btn" data-shape="arch" onclick="setShape('arch')">
+              <div class="shape-icon">⌒</div>
+              <span>Kaari</span>
+            </div>
+            <div class="shape-btn" data-shape="diamond" onclick="setShape('diamond')">
+              <div class="shape-icon">◇</div>
+              <span>Timantti</span>
+            </div>
+          </div>
+          <div id="maskScaleWrap" style="display:none;margin-top:12px;">
+            <label>Maskin koko</label>
+            <div class="range-row">
+              <input type="range" min="20" max="100" value="100" step="1" id="maskScale" oninput="updateCanvas()">
+              <span class="range-val" id="maskScaleVal">100%</span>
+            </div>
+          </div>
+          <button class="btn btn-secondary mt8" id="previewShapeBtn" onclick="toggleShapePreview()">
+            Esikatselu muodossa
+          </button>
+        </div><!-- end section-body -->
+      </div><!-- end section-clipmask -->
+
+      <!-- STEP 8: EXPORT — always visible -->
+      <div class="panel-section no-collapse">
+        <div class="section-step">VAIHE 8</div>
+        <div class="section-title">Vienti</div>
+        <div class="col">
+          <div>
+            <label>Pohjakerroksen kutistus (px)</label>
+            <div class="range-row">
+              <input type="range" min="0" max="8" value="2" step="1" id="erosion" oninput="updateCanvas()">
+              <span class="range-val" id="erosionVal">2 px</span>
+            </div>
+          </div>
+          <div>
+            <label>Väriavaruus</label>
+            <div class="tabs" style="margin-bottom:0">
+              <div class="tab active" id="colorspaceRGB" onclick="setColorspace('rgb')">RGB</div>
+              <div class="tab" id="colorspaceCMYK" onclick="setColorspace('cmyk')">CMYK (approx.)</div>
+            </div>
+            <div style="font-size:11px;color:var(--text3);margin-top:5px;" id="colorspaceDesc">Tallentuu PNG-muodossa
+              RGB-väriavaruudessa.</div>
+          </div>
+          <button class="btn btn-export" id="exportBtn" onclick="exportFiles()" disabled>
+            Vie DTF-tiedostot (2× PNG)
+          </button>
+          <div style="font-size:11px;color:var(--text3);" id="exportDesc">printgen_kuva.png + printgen_pohja.png · 300
+            DPI</div>
+
+          <!-- COLOR SEPARATION -->
+          <hr style="margin:4px 0;">
+          <div>
+            <label>Värikerrosten erottelu</label>
+            <div style="font-size:11px;color:var(--text3);margin-bottom:8px;">Analysoi kuvan värit ja vie jokainen omana
+              PNG-tiedostona ZIP-pakettina.</div>
+
+            <div style="margin-bottom:8px;">
+              <div class="flex-between" style="margin-bottom:3px;">
+                <label style="margin-bottom:0;font-size:11px;">Värien määrä</label>
+                <span class="range-val" id="sepColorsVal">8</span>
+              </div>
+              <input type="range" min="2" max="16" value="8" step="1" id="sepColors"
+                oninput="document.getElementById('sepColorsVal').textContent=this.value; state.colorLayers=null; renderColorPreview();">
+            </div>
+
+            <!-- Color preview swatches — populated after analysis -->
+            <div id="colorLayerPreview" style="display:none;margin-bottom:8px;">
+              <div style="font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;margin-bottom:6px;">
+                TUNNISTETUT VÄRIT</div>
+              <div id="colorLayerSwatches" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
+            </div>
+
+            <button class="btn btn-secondary" id="analyzeBtn" onclick="analyzeColors()" disabled
+              style="margin-bottom:6px;">
+              <span id="analyzeBtnContent">🔍 Analysoi värit</span>
+            </button>
+            <button class="btn" id="zipExportBtn" onclick="exportColorLayers()" disabled
+              style="background:#1a1a3d;color:#a0a0f0;border:1px solid #2a2a5a;width:100%;">
+              <span id="zipBtnContent">↓ Lataa värikerrokset (ZIP)</span>
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('mainCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let state = {
+      mainImage: null,
+      logoImage: null,
+      logoBgRemovedCanvas: null,
+      bgColors: [],
+      eyedropperActive: false,
+      shirtBg: 'light',
+      shape: 'none',
+      shapePreview: false,
+      logoStrength: 0,
+      processedImageData: null,
+      hasImage: false,
+      halftonePreview: false,
+      upscaleMultiplier: 2,
+      currentView: 'editor',
+      tritoneActive: false,
+      cmykMode: false,
+      colorLayers: null, // [{r,g,b, name, pixels:[{x,y}]}]
+    };
+
+    // ===== VIEW TOGGLE (poistettu käytöstä — hämmentävä UX) =====
+    /*
+    function setView(view) {
+      state.currentView = view;
+      document.body.classList.remove('view-editor', 'view-layout');
+      document.body.classList.add('view-' + view);
+      document.getElementById('viewEditorBtn').classList.toggle('active', view === 'editor');
+      document.getElementById('viewLayoutBtn').classList.toggle('active', view === 'layout');
+    }
+    */
+    function setView() { } // stub — toggle piilotettu
+
+    // ===== ADMIN MODAL =====
+    function openAdmin() {
+      document.getElementById('adminModalOverlay').classList.add('open');
+    }
+    function closeAdmin() {
+      document.getElementById('adminModalOverlay').classList.remove('open');
+    }
+    function closeAdminOnOverlay(e) {
+      if (e.target === document.getElementById('adminModalOverlay')) closeAdmin();
+    }
+
+    // Map: featureId -> sectionId  (sections that can be toggled off)
+    const FEATURE_SECTIONS = {
+      featureUpscale: 'section-upscale',
+      featureLogo: 'section-logo',
+      featureBgRemoval: 'section-bgremoval',
+      featureColorAdj: 'section-coloradj',
+      featureHalftone: 'section-halftone',
+      featureShirt: 'section-shirt',
+      featureClipmask: 'section-clipmask',
+    };
+
+    // Save/load feature states via localStorage
+    function saveFeatureStates() {
+      const saved = {};
+      Object.keys(FEATURE_SECTIONS).forEach(id => {
+        saved[id] = document.getElementById(id).checked;
+      });
+      try { localStorage.setItem('printgen_features', JSON.stringify(saved)); } catch (e) { }
+    }
+
+    function loadFeatureStates() {
+      try {
+        const saved = JSON.parse(localStorage.getItem('printgen_features') || '{}');
+        Object.keys(FEATURE_SECTIONS).forEach(id => {
+          if (id in saved) {
+            document.getElementById(id).checked = saved[id];
+          }
+        });
+      } catch (e) { }
+    }
+
+    function applyFeatureToggles() {
+      Object.entries(FEATURE_SECTIONS).forEach(([featureId, sectionId]) => {
+        const enabled = document.getElementById(featureId).checked;
+        const section = document.getElementById(sectionId);
+        if (!section) return;
+        if (enabled) {
+          section.classList.remove('disabled-step');
+          // Re-expand if it was collapsed due to being disabled
+          section.classList.remove('collapsed');
+        } else {
+          section.classList.add('disabled-step');
+          section.classList.add('collapsed');
+        }
+      });
+      saveFeatureStates();
+    }
+
+    // Make section headers clickable to collapse/expand (only for collapsible sections)
+    function initCollapsibleSections() {
+      document.querySelectorAll('.panel-section:not(.no-collapse)').forEach(section => {
+        const header = section.querySelector('.section-header');
+        if (!header) return;
+        header.style.cursor = 'pointer';
+        header.addEventListener('click', () => {
+          // Don't collapse if section is disabled
+          if (section.classList.contains('disabled-step')) return;
+          section.classList.toggle('collapsed');
+        });
+      });
+    }
+
+    // ===== CANVAS SETUP =====
+    function resizeCanvas() {
+      const area = document.getElementById('canvasArea');
+      const w = area.clientWidth - 40;
+      const h = area.clientHeight - 40;
+      const ratio = Math.min(w / 500, h / 600);
+      canvas.style.width = Math.floor(500 * ratio) + 'px';
+      canvas.style.height = Math.floor(600 * ratio) + 'px';
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    // ===== TAB SWITCH =====
+    function switchTab(tab) {
+      document.getElementById('tabText').classList.toggle('active', tab === 'text');
+      document.getElementById('tabUpload').classList.toggle('active', tab === 'upload');
+      document.getElementById('inputText').style.display = tab === 'text' ? 'block' : 'none';
+      document.getElementById('inputUpload').style.display = tab === 'upload' ? 'block' : 'none';
+    }
+
+    // ===== CATEGORY TAGS =====
+    function addCategory(cat) {
+      const p = document.getElementById('promptInput');
+      if (!p.value.includes(cat)) {
+        p.value = (p.value ? p.value + ', ' : '') + cat;
+      }
+    }
+
+    // ===== COLOR ADJUSTMENTS =====
+    const PRESETS = {
+      original: { brightness: 0, contrast: 0, saturation: 0, temperature: 0, posterize: 0, tritone: false },
+      bw: { brightness: 0, contrast: 15, saturation: -100, temperature: 0, posterize: 0, tritone: false },
+      sepia: { brightness: 5, contrast: 10, saturation: -80, temperature: 60, posterize: 0, tritone: false },
+      hicontrast: { brightness: 0, contrast: 70, saturation: 20, temperature: 0, posterize: 0, tritone: false },
+      cartoon: { brightness: 5, contrast: 50, saturation: 60, temperature: 0, posterize: 6, tritone: false },
+      fade: { brightness: 20, contrast: -30, saturation: -30, temperature: 10, posterize: 0, tritone: false },
+      duotone: {
+        brightness: 0, contrast: 20, saturation: -100, temperature: 0, posterize: 0, tritone: true,
+        shadow: '#0d1b6e', mid: '#c44b8a', highlight: '#fce4b0', strength: 100
+      },
+      warm: { brightness: 5, contrast: 5, saturation: 15, temperature: 50, posterize: 0, tritone: false },
+    };
+
+    function applyPreset(name) {
+      const p = PRESETS[name];
+      if (!p) return;
+      document.getElementById('brightnessSlider').value = p.brightness;
+      document.getElementById('contrastSlider').value = p.contrast;
+      document.getElementById('saturationSlider').value = p.saturation;
+      document.getElementById('temperatureSlider').value = p.temperature;
+      document.getElementById('posterizeSlider').value = p.posterize;
+
+      if (p.tritone) {
+        state.tritoneActive = true;
+        document.getElementById('tritoneControls').style.display = 'block';
+        document.getElementById('tritoneToggleBtn').textContent = 'ON';
+        document.getElementById('tritoneToggleBtn').style.color = 'var(--accent)';
+        document.getElementById('tritoneShadow').value = p.shadow;
+        document.getElementById('tritoneMid').value = p.mid;
+        document.getElementById('tritoneHighlight').value = p.highlight;
+        document.getElementById('tritoneStrength').value = p.strength;
+      } else {
+        state.tritoneActive = false;
+        document.getElementById('tritoneControls').style.display = 'none';
+        document.getElementById('tritoneToggleBtn').textContent = 'OFF';
+        document.getElementById('tritoneToggleBtn').style.color = '';
+      }
+
+      document.querySelectorAll('.preset-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.preset === name)
+      );
+      updateColorAdj();
+    }
+
+    function resetColorAdj() {
+      applyPreset('original');
+    }
+
+    function toggleTritone() {
+      state.tritoneActive = !state.tritoneActive;
+      const btn = document.getElementById('tritoneToggleBtn');
+      document.getElementById('tritoneControls').style.display = state.tritoneActive ? 'block' : 'none';
+      btn.textContent = state.tritoneActive ? 'ON' : 'OFF';
+      btn.style.color = state.tritoneActive ? 'var(--accent)' : '';
+      updateColorAdj();
+    }
+
+    function updateColorAdj() {
+      // Update displayed values
+      document.getElementById('brightnessVal').textContent = document.getElementById('brightnessSlider').value;
+      document.getElementById('contrastVal').textContent = document.getElementById('contrastSlider').value;
+      document.getElementById('saturationVal').textContent = document.getElementById('saturationSlider').value;
+      document.getElementById('temperatureVal').textContent = document.getElementById('temperatureSlider').value;
+      const pv = parseInt(document.getElementById('posterizeSlider').value);
+      document.getElementById('posterizeVal').textContent = pv === 0 ? 'Ei käytössä' : pv + ' väriä';
+      document.getElementById('tritoneStrengthVal').textContent = document.getElementById('tritoneStrength').value + '%';
+
+      // Deactivate all presets since user is manually tweaking
+      // (only if we got here via slider, not via applyPreset)
+      updateCanvas();
+    }
+
+    // Core color processing — applied to an offscreen canvas, returns new canvas
+    function applyColorAdjustments(srcCanvas) {
+      const brightness = parseInt(document.getElementById('brightnessSlider').value);
+      const contrast = parseInt(document.getElementById('contrastSlider').value);
+      const saturation = parseInt(document.getElementById('saturationSlider').value);
+      const temperature = parseInt(document.getElementById('temperatureSlider').value);
+      const posterize = parseInt(document.getElementById('posterizeSlider').value);
+
+      // Short-circuit if everything is default and tritone off
+      if (brightness === 0 && contrast === 0 && saturation === 0 &&
+        temperature === 0 && posterize === 0 && !state.tritoneActive) {
+        return srcCanvas;
+      }
+
+      const w = srcCanvas.width;
+      const h = srcCanvas.height;
+      const out = document.createElement('canvas');
+      out.width = w; out.height = h;
+      const octx = out.getContext('2d');
+      octx.drawImage(srcCanvas, 0, 0);
+      const id = octx.getImageData(0, 0, w, h);
+      const data = id.data;
+
+      // Precompute contrast factor
+      const cFactor = contrast !== 0
+        ? (259 * (contrast + 255)) / (255 * (259 - contrast))
+        : 1;
+
+      // Tritone colours parsed once
+      let triShadow, triMid, triHighlight, triStrength;
+      if (state.tritoneActive) {
+        triShadow = hexToRgb(document.getElementById('tritoneShadow').value);
+        triMid = hexToRgb(document.getElementById('tritoneMid').value);
+        triHighlight = hexToRgb(document.getElementById('tritoneHighlight').value);
+        triStrength = parseInt(document.getElementById('tritoneStrength').value) / 100;
+      }
+
+      for (let i = 0; i < data.length; i += 4) {
+        if (data[i + 3] === 0) continue; // skip transparent pixels
+
+        let r = data[i], g = data[i + 1], b = data[i + 2];
+
+        // 1. Temperature (shift R and B channels)
+        if (temperature !== 0) {
+          const t = temperature / 100;
+          r = clamp(r + t * 30);
+          b = clamp(b - t * 20);
+          g = clamp(g + t * 5);
+        }
+
+        // 2. Brightness
+        if (brightness !== 0) {
+          const bv = brightness * 2.55;
+          r = clamp(r + bv);
+          g = clamp(g + bv);
+          b = clamp(b + bv);
+        }
+
+        // 3. Contrast
+        if (contrast !== 0) {
+          r = clamp(cFactor * (r - 128) + 128);
+          g = clamp(cFactor * (g - 128) + 128);
+          b = clamp(cFactor * (b - 128) + 128);
+        }
+
+        // 4. Saturation (via luminance)
+        if (saturation !== 0) {
+          const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+          const s = 1 + saturation / 100;
+          r = clamp(lum + s * (r - lum));
+          g = clamp(lum + s * (g - lum));
+          b = clamp(lum + s * (b - lum));
+        }
+
+        // 5. Posterization
+        if (posterize > 0) {
+          const levels = posterize;
+          r = Math.round(Math.round(r / 255 * (levels - 1)) / (levels - 1) * 255);
+          g = Math.round(Math.round(g / 255 * (levels - 1)) / (levels - 1) * 255);
+          b = Math.round(Math.round(b / 255 * (levels - 1)) / (levels - 1) * 255);
+        }
+
+        // 6. Tritone (map luminance to 3-colour gradient)
+        if (state.tritoneActive) {
+          const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+          let tr, tg, tb;
+          if (lum < 0.5) {
+            const t = lum * 2;
+            tr = lerp(triShadow[0], triMid[0], t);
+            tg = lerp(triShadow[1], triMid[1], t);
+            tb = lerp(triShadow[2], triMid[2], t);
+          } else {
+            const t = (lum - 0.5) * 2;
+            tr = lerp(triMid[0], triHighlight[0], t);
+            tg = lerp(triMid[1], triHighlight[1], t);
+            tb = lerp(triMid[2], triHighlight[2], t);
+          }
+          r = Math.round(lerp(r, tr, triStrength));
+          g = Math.round(lerp(g, tg, triStrength));
+          b = Math.round(lerp(b, tb, triStrength));
+        }
+
+        data[i] = r;
+        data[i + 1] = g;
+        data[i + 2] = b;
+      }
+
+      octx.putImageData(id, 0, 0);
+      return out;
+    }
+
+    function clamp(v) { return Math.max(0, Math.min(255, Math.round(v))); }
+    function lerp(a, b, t) { return a + (b - a) * t; }
+    function hexToRgb(hex) {
+      const r = parseInt(hex.slice(1, 3), 16);
+      const g = parseInt(hex.slice(3, 5), 16);
+      const b = parseInt(hex.slice(5, 7), 16);
+      return [r, g, b];
+    }
+
+    // ===== SHAPE =====
+    function setShape(s) {
+      state.shape = s;
+      document.querySelectorAll('.shape-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.shape === s);
+      });
+      document.getElementById('maskScaleWrap').style.display = s !== 'none' ? 'block' : 'none';
+      updateCanvas();
+    }
+
+    function toggleShapePreview() {
+      state.shapePreview = !state.shapePreview;
+      const btn = document.getElementById('previewShapeBtn');
+      btn.textContent = state.shapePreview ? 'Piilota muoto' : 'Esikatselu muodossa';
+      btn.style.color = state.shapePreview ? 'var(--accent)' : '';
+      btn.style.borderColor = state.shapePreview ? 'var(--accent2)' : '';
+      updateCanvas();
+    }
+
+    // ===== SHIRT BG =====
+    function setShirtBg(mode) {
+      state.shirtBg = mode;
+      ['Light', 'Dark', 'None'].forEach(m => {
+        document.getElementById('shirt' + m).classList.toggle('active', mode === m.toLowerCase());
+      });
+      updateCanvas();
+    }
+
+    // ===== EYEDROPPER =====
+    function toggleEyedropper() {
+      state.eyedropperActive = !state.eyedropperActive;
+      const btn = document.getElementById('eyedropperBtn');
+      btn.style.borderColor = state.eyedropperActive ? 'var(--accent2)' : '';
+      btn.style.color = state.eyedropperActive ? 'var(--accent)' : '';
+      canvas.style.cursor = state.eyedropperActive ? 'crosshair' : 'default';
+    }
+
+    function clearColors() {
+      state.bgColors = [];
+      renderSwatches();
+      updateCanvas();
+    }
+
+    canvas.addEventListener('click', (e) => {
+      if (!state.eyedropperActive || !state.mainImage) return;
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      const x = Math.floor((e.clientX - rect.left) * scaleX);
+      const y = Math.floor((e.clientY - rect.top) * scaleY);
+      const pixel = ctx.getImageData(x, y, 1, 1).data;
+      const hex = rgbToHex(pixel[0], pixel[1], pixel[2]);
+      if (!state.bgColors.includes(hex)) {
+        state.bgColors.push(hex);
+        renderSwatches();
+        updateCanvas();
+      }
+      toggleEyedropper();
+    });
+
+    function rgbToHex(r, g, b) {
+      return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+    }
+
+    function renderSwatches() {
+      const cont = document.getElementById('selectedColors');
+      cont.innerHTML = state.bgColors.map(c =>
+        `<div class="swatch active" style="background:${c}" title="${c}"></div>`
+      ).join('');
+    }
+
+    // ===== FILE UPLOAD =====
+    function handleFileUpload(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const img = new Image();
+        img.onload = () => {
+          state.mainImage = img;
+          state.hasImage = true;
+          updateUpscaleInfo();
+          updateCanvas();
+          updateExportBtn();
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // Drag & drop
+    const dropzone = document.getElementById('dropzone');
+    dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag-over'); });
+    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
+    dropzone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropzone.classList.remove('drag-over');
+      const file = e.dataTransfer.files[0];
+      if (file && file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = ev => {
+          const img = new Image();
+          img.onload = () => {
+            state.mainImage = img;
+            state.hasImage = true;
+            updateUpscaleInfo();
+            updateCanvas();
+            updateExportBtn();
+          };
+          img.src = ev.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    // ===== UPSCALE =====
+    function setUpscaleMultiplier(n) {
+      state.upscaleMultiplier = n;
+      [2, 3, 4].forEach(x => {
+        document.getElementById('upscale' + x + 'x').classList.toggle('active', x === n);
+      });
+      updateUpscaleInfo();
+    }
+
+    function updateUpscaleInfo() {
+      const el = document.getElementById('upscaleInfo');
+      const btn = document.getElementById('upscaleBtn');
+      if (!state.mainImage) {
+        el.textContent = '—';
+        btn.disabled = true;
+        return;
+      }
+      const srcW = state.mainImage.naturalWidth;
+      const srcH = state.mainImage.naturalHeight;
+      const n = state.upscaleMultiplier;
+      el.textContent = `${srcW}×${srcH} → ${srcW * n}×${srcH * n} px`;
+      btn.disabled = false;
+    }
+
+    function doUpscale() {
+      if (!state.mainImage) return;
+      const n = state.upscaleMultiplier;
+      const srcW = state.mainImage.naturalWidth;
+      const srcH = state.mainImage.naturalHeight;
+      const newW = srcW * n;
+      const newH = srcH * n;
+
+      const btn = document.getElementById('upscaleBtn');
+      btn.disabled = true;
+      document.getElementById('upscaleBtnContent').innerHTML = '<span class="spinner"></span> Upscalataan...';
+
+      // Use offscreen canvas with high-quality rendering
+      const off = document.createElement('canvas');
+      off.width = newW;
+      off.height = newH;
+      const octx = off.getContext('2d');
+      octx.imageSmoothingEnabled = true;
+      octx.imageSmoothingQuality = 'high';
+      octx.drawImage(state.mainImage, 0, 0, newW, newH);
+
+      off.toBlob(blob => {
+        const url = URL.createObjectURL(blob);
+        const img = new Image();
+        img.onload = () => {
+          state.mainImage = img;
+          updateUpscaleInfo();
+          updateCanvas();
+          updateExportBtn();
+          btn.disabled = false;
+          document.getElementById('upscaleBtnContent').textContent = '↑ Upscale kuva';
+          showToast(`Upscale valmis: ${newW}×${newH} px`);
+        };
+        img.src = url;
+      }, 'image/png');
+    }
+
+    // ===== LOGO =====
+    function handleLogoUpload(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const img = new Image();
+        img.onload = () => {
+          state.logoImage = img;
+          state.logoBgRemovedCanvas = null; // reset processed logo
+          document.getElementById('logoControls').style.display = 'block';
+          document.getElementById('logoDropzone').style.display = 'none';
+          document.getElementById('logoBgDesc').textContent = 'Lukee kulmapikselin värin ja poistaa sen alphakanavalla.';
+          updateCanvas();
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function removeLogo() {
+      state.logoImage = null;
+      state.logoBgRemovedCanvas = null;
+      document.getElementById('logoControls').style.display = 'none';
+      document.getElementById('logoDropzone').style.display = 'block';
+      document.getElementById('logoInput').value = '';
+      updateCanvas();
+    }
+
+    function removeLogoBg() {
+      if (!state.logoImage) return;
+      const img = state.logoImage;
+      const w = img.naturalWidth;
+      const h = img.naturalHeight;
+
+      const off = document.createElement('canvas');
+      off.width = w;
+      off.height = h;
+      const octx = off.getContext('2d');
+      octx.drawImage(img, 0, 0);
+
+      const imageData = octx.getImageData(0, 0, w, h);
+      const data = imageData.data;
+
+      // Sample corner pixels to detect background color
+      const corners = [
+        [0, 0],
+        [w - 1, 0],
+        [0, h - 1],
+        [w - 1, h - 1],
+      ];
+
+      // Pick the most common corner color
+      const cornerColors = corners.map(([cx, cy]) => {
+        const i = (cy * w + cx) * 4;
+        return [data[i], data[i + 1], data[i + 2]];
+      });
+
+      // Use top-left pixel as primary bg color reference
+      const [bgR, bgG, bgB] = cornerColors[0];
+
+      const tolerance = 40; // fixed tolerance for logo bg removal
+
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i], g = data[i + 1], b = data[i + 2];
+        const dist = Math.sqrt((r - bgR) ** 2 + (g - bgG) ** 2 + (b - bgB) ** 2);
+        if (dist < tolerance * 2) {
+          data[i + 3] = 0;
+        }
+      }
+
+      octx.putImageData(imageData, 0, 0);
+      state.logoBgRemovedCanvas = off;
+
+      // Update the logoImage to reflect bg removal
+      off.toBlob(blob => {
+        const url = URL.createObjectURL(blob);
+        const newImg = new Image();
+        newImg.onload = () => {
+          state.logoImage = newImg;
+          state.logoBgRemovedCanvas = null;
+          updateCanvas();
+          document.getElementById('logoBgDesc').textContent = `Tausta poistettu (RGB: ${bgR},${bgG},${bgB})`;
+          showToast('Logon tausta poistettu');
+        };
+        newImg.src = url;
+      }, 'image/png');
+    }
+
+    function updateLogoStrength(v) {
+      state.logoStrength = parseInt(v);
+      const desc = document.getElementById('logoStrengthDesc');
+      if (v < 20) desc.textContent = 'AI ei muokkaa logoa — compositetaan päälle sellaisenaan.';
+      else if (v < 60) desc.textContent = 'AI voi muokata logon tyyliä, rakenne säilyy.';
+      else desc.textContent = 'AI muokkaa logoa vapaasti promptin mukaan.';
+      updateCanvas();
+    }
+
+    // ===== AI GENERATION =====
+    async function generateImage() {
+      const prompt = document.getElementById('promptInput').value.trim();
+      if (!prompt) {
+        showToast('Kirjoita ensin kuvauksen tekstikenttään', 'warn');
+        return;
+      }
+
+      const btn = document.getElementById('generateBtn');
+      const statusEl = document.getElementById('genStatus');
+      const progressWrap = document.getElementById('progressWrap');
+      const progressBar = document.getElementById('progressBar');
+
+      btn.disabled = true;
+      document.getElementById('genBtnContent').innerHTML = '<span class="spinner"></span> Generoidaan...';
+      progressWrap.style.display = 'block';
+      progressBar.style.width = '0%';
+      setApiStatus('loading');
+
+      let prog = 0;
+      const progInterval = setInterval(() => {
+        prog = Math.min(prog + (Math.random() * 3), 85);
+        progressBar.style.width = prog + '%';
+      }, 500);
+
+      statusEl.textContent = 'Lähetetään pyyntö Flux-mallille...';
+
+      const dtfPrompt = prompt + ', transparent background, isolated on white, high contrast, sharp edges, DTF print ready, no background';
+
+      try {
+        const response = await fetch(
+          'https://hf-proxy-poc.bgnoiseandthecubicles.workers.dev',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              inputs: dtfPrompt,
+              parameters: { width: 1024, height: 1024, num_inference_steps: 4 }
+            })
+          }
+        );
+
+        if (response.status === 503) {
+          statusEl.textContent = 'Malli käynnistyy (cold start) — odotetaan...';
+          progressBar.style.width = '15%';
+          await new Promise(r => setTimeout(r, 22000));
+          clearInterval(progInterval);
+          btn.disabled = false;
+          document.getElementById('genBtnContent').textContent = 'Generoi kuva';
+          progressWrap.style.display = 'none';
+          setApiStatus('ready');
+          statusEl.textContent = 'Malli käynnistyi — paina Generoi uudelleen.';
+          return;
+        }
+
+        if (!response.ok) {
+          const err = await response.text();
+          throw new Error(`API virhe ${response.status}: ${err}`);
+        }
+
+        clearInterval(progInterval);
+        progressBar.style.width = '95%';
+        statusEl.textContent = 'Kuva saapui — ladataan...';
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const img = new Image();
+        img.onload = () => {
+          state.mainImage = img;
+          state.hasImage = true;
+          state.bgColors = [];
+          renderSwatches();
+          progressBar.style.width = '100%';
+          statusEl.textContent = 'Valmis!';
+          setTimeout(() => {
+            progressWrap.style.display = 'none';
+            statusEl.textContent = '';
+          }, 1500);
+          updateUpscaleInfo();
+          updateCanvas();
+          updateExportBtn();
+          setApiStatus('ready');
+          showToast('Kuva generoitu onnistuneesti');
+        };
+        img.src = url;
+
+      } catch (err) {
+        clearInterval(progInterval);
+        console.error(err);
+        statusEl.textContent = 'Virhe: ' + err.message;
+        progressWrap.style.display = 'none';
+        setApiStatus('error');
+        showToast('Virhe generoinnissa — tarkista token', 'error');
+      }
+
+      btn.disabled = false;
+      document.getElementById('genBtnContent').textContent = 'Generoi kuva';
+    }
+
+    // ===== CANVAS RENDER =====
+    function updateCanvas() {
+      const w = canvas.width;
+      const h = canvas.height;
+      ctx.clearRect(0, 0, w, h);
+
+      // Shirt background
+      if (state.shirtBg === 'light') {
+        drawShirtSilhouette(ctx, w, h, '#e8e4dc');
+      } else if (state.shirtBg === 'dark') {
+        drawShirtSilhouette(ctx, w, h, '#1e1e1e');
+      } else {
+        ctx.fillStyle = '#2a2a2a';
+        ctx.fillRect(0, 0, w, h);
+      }
+
+      // Print area border — reads live from admin inputs
+      const pw = parseFloat(document.getElementById('adminW').value) || 30;
+      const ph = parseFloat(document.getElementById('adminH').value) || 36;
+      const areaW = w * 0.72;
+      const areaH = h * 0.72;
+      const areaX = (w - areaW) / 2;
+      const areaY = h * 0.14;
+      ctx.strokeStyle = 'rgba(100,220,120,0.5)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([6, 4]);
+      ctx.strokeRect(areaX, areaY, areaW, areaH);
+      ctx.setLineDash([]);
+      ctx.font = '10px DM Mono, monospace';
+      ctx.fillStyle = 'rgba(100,220,120,0.6)';
+      ctx.fillText(`${pw}×${ph} cm · 300 DPI`, areaX + 4, areaY - 4);
+
+      if (!state.mainImage) {
+        document.getElementById('canvasLabel').style.display = 'block';
+        updateDPI(null);
+        return;
+      }
+      document.getElementById('canvasLabel').style.display = 'none';
+
+      // Get transform values
+      const sizeCm = parseFloat(document.getElementById('sizeSlider').value);
+      const rot = parseFloat(document.getElementById('rotSlider').value) * Math.PI / 180;
+      const posXPct = parseFloat(document.getElementById('posX').value) / 100;
+      const posYPct = parseFloat(document.getElementById('posY').value) / 100;
+      const maskScale = parseFloat(document.getElementById('maskScale').value) / 100;
+
+      document.getElementById('sizeVal').textContent = sizeCm + ' cm';
+      document.getElementById('rotVal').textContent = document.getElementById('rotSlider').value + '°';
+      document.getElementById('posXVal').textContent = document.getElementById('posX').value + '%';
+      document.getElementById('posYVal').textContent = document.getElementById('posY').value + '%';
+      document.getElementById('toleranceVal').textContent = document.getElementById('tolerance').value;
+      document.getElementById('erosionVal').textContent = document.getElementById('erosion').value + ' px';
+      document.getElementById('logoSizeVal').textContent = (document.getElementById('logoSize').value || 40) + '%';
+      document.getElementById('maskScaleVal').textContent = document.getElementById('maskScale').value + '%';
+
+      const pxPerCm = areaW / pw;
+      const imgPx = sizeCm * pxPerCm;
+      const cx = areaX + areaW * posXPct;
+      const cy = areaY + areaH * posYPct;
+      const ar = state.mainImage.naturalWidth / state.mainImage.naturalHeight;
+      const imgW = imgPx;
+      const imgH = imgPx / ar;
+
+      // Mask dimensions (scaled independently)
+      const maskW = imgW * maskScale;
+      const maskH = imgH * maskScale;
+
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(rot);
+
+      if (state.shapePreview && state.shape !== 'none') {
+        applyShapeClip(ctx, -maskW / 2, -maskH / 2, maskW, maskH);
+      }
+
+      const processed = getProcessedImage(state.mainImage, imgW, imgH);
+      ctx.drawImage(processed, -imgW / 2, -imgH / 2, imgW, imgH);
+      ctx.restore();
+
+      // Compose logo on top (locked mode)
+      if (state.logoImage && state.logoStrength < 20) {
+        const logoPct = parseFloat(document.getElementById('logoSize').value) / 100;
+        const logoW = imgW * logoPct;
+        const logoH = logoW * (state.logoImage.naturalHeight / state.logoImage.naturalWidth);
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(rot);
+        ctx.drawImage(state.logoImage, -logoW / 2, -logoH / 2, logoW, logoH);
+        ctx.restore();
+      }
+
+      // Halftone preview — rendered to offscreen canvas, then composited on top
+      // (never clears the main canvas — fixes the "räjähdys" bug)
+      if (state.halftonePreview) {
+        const cellSize = parseInt(document.getElementById('halftoneCell').value);
+        const angle = parseInt(document.getElementById('halftoneAngle').value);
+        const halftoneLayer = applyHalftoneAlphaSafe(canvas, cellSize, angle);
+        ctx.clearRect(0, 0, w, h);
+        // Redraw background first, then halftone layer on top
+        if (state.shirtBg === 'light') {
+          drawShirtSilhouette(ctx, w, h, '#e8e4dc');
+        } else if (state.shirtBg === 'dark') {
+          drawShirtSilhouette(ctx, w, h, '#1e1e1e');
+        } else {
+          ctx.fillStyle = '#2a2a2a';
+          ctx.fillRect(0, 0, w, h);
+        }
+        ctx.setLineDash([6, 4]);
+        ctx.strokeStyle = 'rgba(100,220,120,0.5)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(areaX, areaY, areaW, areaH);
+        ctx.setLineDash([]);
+        ctx.font = '10px DM Mono, monospace';
+        ctx.fillStyle = 'rgba(100,220,120,0.6)';
+        ctx.fillText(`${pw}×${ph} cm · 300 DPI`, areaX + 4, areaY - 4);
+        ctx.drawImage(halftoneLayer, 0, 0);
+      }
+
+      updateDPI(state.mainImage, sizeCm);
+    }
+
+    // ===== SHAPE CLIP =====
+    function applyShapeClip(ctx, x, y, w, h) {
+      ctx.beginPath();
+      switch (state.shape) {
+        case 'circle':
+          ctx.arc(x + w / 2, y + h / 2, Math.min(w, h) / 2, 0, Math.PI * 2);
+          break;
+        case 'rounded': {
+          const r = Math.min(w, h) * 0.15;
+          ctx.roundRect(x, y, w, h, r);
+          break;
+        }
+        case 'square': {
+          const s = Math.min(w, h);
+          ctx.rect(x + (w - s) / 2, y + (h - s) / 2, s, s);
+          break;
+        }
+        case 'ellipse':
+          ctx.ellipse(x + w / 2, y + h / 2, w / 2, h * 0.38, 0, 0, Math.PI * 2);
+          break;
+        case 'shield': {
+          const mx = x + w / 2;
+          ctx.moveTo(mx, y);
+          ctx.lineTo(x + w, y + h * 0.35);
+          ctx.lineTo(x + w, y + h * 0.65);
+          ctx.lineTo(mx, y + h);
+          ctx.lineTo(x, y + h * 0.65);
+          ctx.lineTo(x, y + h * 0.35);
+          ctx.closePath();
+          break;
+        }
+        case 'arch':
+          ctx.moveTo(x, y + h);
+          ctx.lineTo(x, y + h * 0.4);
+          ctx.quadraticCurveTo(x + w / 2, y - h * 0.1, x + w, y + h * 0.4);
+          ctx.lineTo(x + w, y + h);
+          ctx.closePath();
+          break;
+        case 'diamond':
+          ctx.moveTo(x + w / 2, y);
+          ctx.lineTo(x + w, y + h / 2);
+          ctx.lineTo(x + w / 2, y + h);
+          ctx.lineTo(x, y + h / 2);
+          ctx.closePath();
+          break;
+        default:
+          ctx.rect(x, y, w, h);
+      }
+      ctx.clip();
+    }
+
+    // ===== PROCESSED IMAGE (with bg removal) =====
+    function getProcessedImage(img, targetW, targetH) {
+      const off = document.createElement('canvas');
+      off.width = Math.round(targetW);
+      off.height = Math.round(targetH);
+      const octx = off.getContext('2d');
+      octx.drawImage(img, 0, 0, off.width, off.height);
+
+      if (state.bgColors.length === 0) return applyColorAdjustments(off);
+
+      // Apply colour adjustments FIRST, then remove background from the adjusted image
+      const adjusted = applyColorAdjustments(off);
+      const adjCtx = adjusted.getContext('2d');
+
+      const tolerance = parseFloat(document.getElementById('tolerance').value);
+      const imageData = adjCtx.getImageData(0, 0, adjusted.width, adjusted.height);
+      const data = imageData.data;
+
+      const targets = state.bgColors.map(hex => {
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        return [r, g, b];
+      });
+
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i], g = data[i + 1], b = data[i + 2];
+        for (const [tr, tg, tb] of targets) {
+          const dist = Math.sqrt((r - tr) ** 2 + (g - tg) ** 2 + (b - tb) ** 2);
+          if (dist < tolerance * 2.2) {
+            data[i + 3] = 0;
+            break;
+          }
+        }
+      }
+      adjCtx.putImageData(imageData, 0, 0);
+      return adjusted;
+    }
+
+    // ===== SHIRT SILHOUETTE =====
+    function drawShirtSilhouette(ctx, w, h, color) {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      const sx = w * 0.1, sy = h * 0.08;
+      const sw = w * 0.8, sh = h * 0.85;
+      ctx.moveTo(sx + sw * 0.25, sy);
+      ctx.quadraticCurveTo(sx + sw * 0.5, sy + sh * 0.07, sx + sw * 0.75, sy);
+      ctx.lineTo(sx + sw, sy + sh * 0.15);
+      ctx.lineTo(sx + sw * 0.82, sy + sh * 0.28);
+      ctx.lineTo(sx + sw * 0.82, sy + sh);
+      ctx.lineTo(sx + sw * 0.18, sy + sh);
+      ctx.lineTo(sx + sw * 0.18, sy + sh * 0.28);
+      ctx.lineTo(sx, sy + sh * 0.15);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = color === '#e8e4dc' ? '#d4d0c8' : '#161616';
+      ctx.beginPath();
+      ctx.moveTo(sx + sw * 0.35, sy + sh * 0.02);
+      ctx.quadraticCurveTo(sx + sw * 0.5, sy + sh * 0.12, sx + sw * 0.65, sy + sh * 0.02);
+      ctx.quadraticCurveTo(sx + sw * 0.5, sy - sh * 0.02, sx + sw * 0.35, sy + sh * 0.02);
+      ctx.fill();
+    }
+
+    // ===== DPI =====
+    function updateDPI(img, sizeCm) {
+      const el = document.getElementById('dpiVal');
+      const desc = document.getElementById('dpiDesc');
+      if (!img || !sizeCm) {
+        el.textContent = '—';
+        el.className = 'dpi-val';
+        desc.textContent = 'Lataa kuva ensin';
+        return;
+      }
+      const dpi = Math.round(img.naturalWidth / (sizeCm / 2.54));
+      el.textContent = dpi;
+      el.className = 'dpi-val ' + (dpi >= 250 ? 'good' : dpi >= 150 ? 'ok' : 'bad');
+      desc.textContent = dpi >= 250 ? 'Erinomainen tulostuslaatu' : dpi >= 150 ? 'Hyväksyttävä laatu' : 'Liian pieni — kasvata kuvaa tai pienennä tulostuskokoa';
+    }
+
+    // ===== CMYK =====
+    function setColorspace(mode) {
+      state.cmykMode = mode === 'cmyk';
+      document.getElementById('colorspaceRGB').classList.toggle('active', !state.cmykMode);
+      document.getElementById('colorspaceCMYK').classList.toggle('active', state.cmykMode);
+      document.getElementById('colorspaceDesc').textContent = state.cmykMode
+        ? 'CMYK-approximaatio: tasoittaa liian kirkkaat RGB-värit painokelpoisiksi.'
+        : 'Tallentuu PNG-muodossa RGB-väriavaruudessa.';
+      document.getElementById('exportDesc').textContent = state.cmykMode
+        ? 'printgen_kuva_cmyk.png + printgen_pohja_cmyk.png · 300 DPI'
+        : 'printgen_kuva.png + printgen_pohja.png · 300 DPI';
+    }
+
+    // RGB → CMYK → RGB round-trip approximation
+    // Clips oversaturated colours to printable gamut
+    function applyCMYKApprox(srcCanvas) {
+      const w = srcCanvas.width;
+      const h = srcCanvas.height;
+      const out = document.createElement('canvas');
+      out.width = w; out.height = h;
+      const octx = out.getContext('2d');
+      octx.drawImage(srcCanvas, 0, 0);
+      const id = octx.getImageData(0, 0, w, h);
+      const d = id.data;
+
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i + 3] === 0) continue;
+        const r = d[i] / 255;
+        const g = d[i + 1] / 255;
+        const b = d[i + 2] / 255;
+
+        // RGB → CMYK
+        const k = 1 - Math.max(r, g, b);
+        if (k === 1) { d[i] = 0; d[i + 1] = 0; d[i + 2] = 0; continue; }
+        const c = (1 - r - k) / (1 - k);
+        const m = (1 - g - k) / (1 - k);
+        const y = (1 - b - k) / (1 - k);
+
+        // Clamp each channel to [0,1] — this is the gamut compression step
+        const cc = Math.min(1, Math.max(0, c));
+        const mc = Math.min(1, Math.max(0, m));
+        const yc = Math.min(1, Math.max(0, y));
+        const kc = Math.min(1, Math.max(0, k));
+
+        // CMYK → RGB
+        d[i] = Math.round((1 - cc) * (1 - kc) * 255);
+        d[i + 1] = Math.round((1 - mc) * (1 - kc) * 255);
+        d[i + 2] = Math.round((1 - yc) * (1 - kc) * 255);
+      }
+      octx.putImageData(id, 0, 0);
+      return out;
+    }
+
+    // ===== EXPORT =====
+    function updateExportBtn() {
+      document.getElementById('exportBtn').disabled = !state.hasImage;
+      document.getElementById('analyzeBtn').disabled = !state.hasImage;
+    }
+
+    function exportFiles() {
+      if (!state.mainImage) return;
+      const pw = parseFloat(document.getElementById('adminW').value) || 30;
+      const ph = parseFloat(document.getElementById('adminH').value) || 36;
+      const outW = Math.round(pw * 300 / 2.54);
+      const outH = Math.round(ph * 300 / 2.54);
+
+      const sizeCm = parseFloat(document.getElementById('sizeSlider').value);
+      const pxPerCm = outW / pw;
+      const imgPx = sizeCm * pxPerCm;
+      const ar = state.mainImage.naturalWidth / state.mainImage.naturalHeight;
+      const imgW = imgPx;
+      const imgH = imgPx / ar;
+      const rot = parseFloat(document.getElementById('rotSlider').value) * Math.PI / 180;
+      const posXPct = parseFloat(document.getElementById('posX').value) / 100;
+      const posYPct = parseFloat(document.getElementById('posY').value) / 100;
+      const cx = outW * posXPct;
+      const cy = outH * posYPct;
+      const erosion = parseInt(document.getElementById('erosion').value);
+      const maskScale = parseFloat(document.getElementById('maskScale').value) / 100;
+      const maskW = imgW * maskScale;
+      const maskH = imgH * maskScale;
+
+      // --- COLOR FILE ---
+      const colorCanvas = document.createElement('canvas');
+      colorCanvas.width = outW;
+      colorCanvas.height = outH;
+      const cc = colorCanvas.getContext('2d');
+
+      // Draw processed image with optional shape clip
+      // Shape clip must be applied to an offscreen canvas first, preserving alpha,
+      // so the exported PNG contains the correct alpha channel with the mask applied.
+      const processedImg = getProcessedImage(state.mainImage, imgW, imgH);
+
+      if (state.shape !== 'none') {
+        // Draw into a temporary canvas with shape clip, then draw that onto colorCanvas
+        const shapeCanvas = document.createElement('canvas');
+        shapeCanvas.width = outW;
+        shapeCanvas.height = outH;
+        const sc = shapeCanvas.getContext('2d');
+        sc.save();
+        sc.translate(cx, cy);
+        sc.rotate(rot);
+        applyShapeClipCtx(sc, -maskW / 2, -maskH / 2, maskW, maskH);
+        sc.drawImage(processedImg, -imgW / 2, -imgH / 2, imgW, imgH);
+        sc.restore();
+        cc.drawImage(shapeCanvas, 0, 0);
+      } else {
+        cc.save();
+        cc.translate(cx, cy);
+        cc.rotate(rot);
+        cc.drawImage(processedImg, -imgW / 2, -imgH / 2, imgW, imgH);
+        cc.restore();
+      }
+
+      // Logo overlay
+      if (state.logoImage && state.logoStrength < 20) {
+        const logoPct = parseFloat(document.getElementById('logoSize').value) / 100;
+        const lw = imgW * logoPct;
+        const lh = lw * (state.logoImage.naturalHeight / state.logoImage.naturalWidth);
+        cc.save();
+        cc.translate(cx, cy);
+        cc.rotate(rot);
+        cc.drawImage(state.logoImage, -lw / 2, -lh / 2, lw, lh);
+        cc.restore();
+      }
+
+      // Apply halftone to color file only (not affecting base/white layer)
+      const halftoneCell = parseInt(document.getElementById('halftoneCell').value);
+      const halftoneAngle = parseInt(document.getElementById('halftoneAngle').value);
+      let exportColorCanvas = state.halftonePreview
+        ? applyHalftoneAlphaSafe(colorCanvas, halftoneCell, halftoneAngle)
+        : colorCanvas;
+
+      // Apply CMYK approximation if selected
+      if (state.cmykMode) exportColorCanvas = applyCMYKApprox(exportColorCanvas);
+
+      const suffix = state.cmykMode ? '_cmyk' : '';
+      downloadCanvas(exportColorCanvas, `printgen_kuva${suffix}.png`);
+
+      // --- WHITE BASE FILE ---
+      // Alpha otetaan suoraan exportColorCanvas-canvasilta (halftone + shape jo mukana).
+      // Näin pohjakerros seuraa täsmälleen samaa alphaa kuin värikuva.
+      setTimeout(() => {
+        const baseCanvas = document.createElement('canvas');
+        baseCanvas.width = outW;
+        baseCanvas.height = outH;
+        const bc = baseCanvas.getContext('2d');
+
+        // Käytä halftone-canvasia alphanlähteenä, aja erosion sen päälle.
+        // applyHalftoneAlphaSafe palauttaa aina 2D-canvaksen, joten tämä toimii suoraan.
+        const erodedBase = applyErosion(exportColorCanvas, erosion);
+        bc.drawImage(erodedBase, 0, 0);
+
+        // Korvaa kaikki ei-läpinäkyvät pikselit valkoisiksi, alpha säilyy
+        const bd = bc.getImageData(0, 0, outW, outH);
+        for (let i = 0; i < bd.data.length; i += 4) {
+          if (bd.data[i + 3] > 10) {
+            bd.data[i] = 255;
+            bd.data[i + 1] = 255;
+            bd.data[i + 2] = 255;
+          }
+        }
+        bc.putImageData(bd, 0, 0);
+        let finalBaseCanvas = baseCanvas;
+        if (state.cmykMode) finalBaseCanvas = applyCMYKApprox(baseCanvas);
+        downloadCanvas(finalBaseCanvas, `printgen_pohja${suffix}.png`);
+        showToast('Molemmat tiedostot viety onnistuneesti');
+      }, 200);
+    }
+
+
+    // Shape clip helper that takes explicit coords (for export contexts)
+    function applyShapeClipCtx(ctx, x, y, w, h) {
+      ctx.beginPath();
+      switch (state.shape) {
+        case 'circle':
+          ctx.arc(x + w / 2, y + h / 2, Math.min(w, h) / 2, 0, Math.PI * 2);
+          break;
+        case 'rounded': {
+          const r = Math.min(w, h) * 0.15;
+          ctx.roundRect(x, y, w, h, r);
+          break;
+        }
+        case 'square': {
+          const s = Math.min(w, h);
+          ctx.rect(x + (w - s) / 2, y + (h - s) / 2, s, s);
+          break;
+        }
+        case 'ellipse':
+          ctx.ellipse(x + w / 2, y + h / 2, w / 2, h * 0.38, 0, 0, Math.PI * 2);
+          break;
+        case 'shield': {
+          const mx = x + w / 2;
+          ctx.moveTo(mx, y);
+          ctx.lineTo(x + w, y + h * 0.35);
+          ctx.lineTo(x + w, y + h * 0.65);
+          ctx.lineTo(mx, y + h);
+          ctx.lineTo(x, y + h * 0.65);
+          ctx.lineTo(x, y + h * 0.35);
+          ctx.closePath();
+          break;
+        }
+        case 'arch':
+          ctx.moveTo(x, y + h);
+          ctx.lineTo(x, y + h * 0.4);
+          ctx.quadraticCurveTo(x + w / 2, y - h * 0.1, x + w, y + h * 0.4);
+          ctx.lineTo(x + w, y + h);
+          ctx.closePath();
+          break;
+        case 'diamond':
+          ctx.moveTo(x + w / 2, y);
+          ctx.lineTo(x + w, y + h / 2);
+          ctx.lineTo(x + w / 2, y + h);
+          ctx.lineTo(x, y + h / 2);
+          ctx.closePath();
+          break;
+        default:
+          ctx.rect(x, y, w, h);
+      }
+      ctx.clip();
+    }
+
+    // ===== HALFTONE — WebGL moottori =====
+    // Korvaa vanhan Canvas API -toteutuksen. Sama rajapinta ulospäin:
+    //   applyHalftoneAlphaSafe(srcCanvas, cellSize, angleDeg) -> canvas
+    // Lisäksi:
+    //   applyHalftoneInPlace(ctx, srcCanvas, cellSize, angleDeg) -> void (esikatselu)
+
+    const _HT = (() => {
+      const VS = `
+        attribute vec2 a_pos;
+        attribute vec2 a_uv;
+        varying vec2 v_uv;
+        void main() { gl_Position=vec4(a_pos,0,1); v_uv=a_uv; }
+      `;
+      const SHAPE_FN = `
+        float shapeDist(vec2 p) { return length(p); }
+        vec2 cellSampleUV(vec2 px,vec2 res,float cell,float angle){
+          float ca=cos(angle);float sa=sin(angle);
+          vec2 rot=vec2(ca*px.x-sa*px.y, sa*px.x+ca*px.y);
+          vec2 c=(floor(rot/cell)+0.5)*cell;
+          vec2 orig=vec2(ca*c.x+sa*c.y,-sa*c.x+ca*c.y);
+          return orig/res;
+        }
+        vec2 cellLocal(vec2 px,float cell,float angle){
+          float ca=cos(angle);float sa=sin(angle);
+          vec2 rot=vec2(ca*px.x-sa*px.y,sa*px.x+ca*px.y);
+          return (fract(rot/cell)-0.5)*2.0;
+        }
+      `;
+      const FS_COLOR = `
+        precision mediump float;
+        uniform sampler2D u_img;
+        uniform vec2 u_res;
+        uniform float u_cell,u_angle,u_maxSize;
+        varying vec2 v_uv;
+        ${SHAPE_FN}
+        void main(){
+          vec2 px=v_uv*u_res;
+          vec2 sUV=cellSampleUV(px,u_res,u_cell,u_angle);
+          if(sUV.x<0.0||sUV.x>1.0||sUV.y<0.0||sUV.y>1.0){gl_FragColor=vec4(0);return;}
+          vec4 col=texture2D(u_img,sUV);
+          if(col.a<0.05){gl_FragColor=vec4(0);return;}
+          float br=dot(col.rgb,vec3(0.299,0.587,0.114));
+          float dotSize=(1.0-br)*u_maxSize;
+          float dist=shapeDist(cellLocal(px,u_cell,u_angle));
+          float mask=1.0-smoothstep(dotSize-0.025,dotSize+0.025,dist);
+          gl_FragColor=vec4(col.rgb,mask*col.a);
+        }
+      `;
+
+      let gl=null, prog=null, buf=null, tex=null;
+
+      function init(w, h) {
+        const cv = document.createElement('canvas');
+        cv.width=w; cv.height=h;
+        gl = cv.getContext('webgl',{premultipliedAlpha:false,preserveDrawingBuffer:true});
+        if (!gl) return false;
+        function mkS(type,src){
+          const s=gl.createShader(type);
+          gl.shaderSource(s,src); gl.compileShader(s);
+          if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)) console.error(gl.getShaderInfoLog(s));
+          return s;
+        }
+        prog=gl.createProgram();
+        gl.attachShader(prog,mkS(gl.VERTEX_SHADER,VS));
+        gl.attachShader(prog,mkS(gl.FRAGMENT_SHADER,FS_COLOR));
+        gl.linkProgram(prog);
+        buf=gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+        gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,0,1,1,-1,1,1,-1,1,0,0,1,1,1,0]),gl.STATIC_DRAW);
+        tex=gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D,tex);
+        gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+        gl.enable(gl.BLEND);
+        gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+        return true;
+      }
+
+      function render(srcCanvas, cellSize, angleDeg) {
+        const w=srcCanvas.width, h=srcCanvas.height;
+        // Re-init jos koko muuttui tai ei ole alustettu
+        if (!gl || gl.canvas.width!==w || gl.canvas.height!==h) {
+          if (!init(w,h)) return fallback(srcCanvas,cellSize,angleDeg);
+        }
+        gl.canvas.width=w; gl.canvas.height=h;
+        gl.viewport(0,0,w,h);
+        gl.clearColor(0,0,0,0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.useProgram(prog);
+        gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+        const aPos=gl.getAttribLocation(prog,'a_pos');
+        const aUV=gl.getAttribLocation(prog,'a_uv');
+        gl.enableVertexAttribArray(aPos); gl.enableVertexAttribArray(aUV);
+        gl.vertexAttribPointer(aPos,2,gl.FLOAT,false,16,0);
+        gl.vertexAttribPointer(aUV,2,gl.FLOAT,false,16,8);
+        gl.bindTexture(gl.TEXTURE_2D,tex);
+        gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,srcCanvas);
+        gl.uniform1i(gl.getUniformLocation(prog,'u_img'),0);
+        gl.uniform2f(gl.getUniformLocation(prog,'u_res'),w,h);
+        gl.uniform1f(gl.getUniformLocation(prog,'u_cell'),cellSize);
+        gl.uniform1f(gl.getUniformLocation(prog,'u_angle'),angleDeg*Math.PI/180);
+        gl.uniform1f(gl.getUniformLocation(prog,'u_maxSize'),0.92);
+        gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+        // Kopioi WebGL-tulos 2D-canvakselle — näin kaikki downstream-funktiot
+        // (applyErosion, applyCMYKApprox, getImageData jne.) toimivat normaalisti.
+        const out2d = document.createElement('canvas');
+        out2d.width = w; out2d.height = h;
+        out2d.getContext('2d').drawImage(gl.canvas, 0, 0);
+        return out2d;
+      }
+
+      // Canvas API fallback jos WebGL ei toimi
+      function fallback(srcCanvas, cellSize, angleDeg) {
+        const w=srcCanvas.width, h=srcCanvas.height;
+        const angle=angleDeg*Math.PI/180;
+        const src=document.createElement('canvas'); src.width=w; src.height=h;
+        const sctx=src.getContext('2d'); sctx.drawImage(srcCanvas,0,0);
+        const srcData=sctx.getImageData(0,0,w,h).data;
+        const out=document.createElement('canvas'); out.width=w; out.height=h;
+        const octx=out.getContext('2d');
+        const cos=Math.cos(angle), sin=Math.sin(angle);
+        const step=cellSize, diagSize=Math.ceil(Math.sqrt(w*w+h*h));
+        for(let row=-diagSize;row<diagSize;row+=step){
+          for(let col=-diagSize;col<diagSize;col+=step){
+            const cx2=col+step/2, cy2=row+step/2;
+            const px=Math.round(cx2*cos-cy2*sin+w/2);
+            const py=Math.round(cx2*sin+cy2*cos+h/2);
+            if(px<0||py<0||px>=w||py>=h) continue;
+            const i=(py*w+px)*4;
+            const a=srcData[i+3]; if(a<10) continue;
+            const r=srcData[i],g=srcData[i+1],b=srcData[i+2];
+            const brightness=(r*0.299+g*0.587+b*0.114)/255;
+            const radius=(1-brightness)*(step/2)*0.95;
+            if(radius<0.5) continue;
+            octx.beginPath();
+            octx.arc(cx2*cos-cy2*sin+w/2,cx2*sin+cy2*cos+h/2,radius,0,Math.PI*2);
+            octx.fillStyle=`rgba(${r},${g},${b},${a/255})`;
+            octx.fill();
+          }
+        }
+        return out;
+      }
+
+      return { render, fallback };
+    })();
+
+    // Julkinen rajapinta — sama kuin ennen, drop-in replacement
+    function applyHalftoneAlphaSafe(srcCanvas, cellSize, angleDeg) {
+      return _HT.render(srcCanvas, cellSize, angleDeg);
+    }
+
+    function applyHalftoneInPlace(ctx, srcCanvas, cellSize, angleDeg) {
+      const result = _HT.render(srcCanvas, cellSize, angleDeg);
+      ctx.clearRect(0, 0, srcCanvas.width, srcCanvas.height);
+      ctx.drawImage(result, 0, 0);
+    }
+
+    // ===== HALFTONE TOGGLE / UPDATE =====
+    function updateHalftoneVals() {
+      document.getElementById('halftoneCellVal').textContent = document.getElementById('halftoneCell').value + ' px';
+      document.getElementById('halftoneAngleVal').textContent = document.getElementById('halftoneAngle').value + '°';
+      if (state.halftonePreview) updateCanvas();
+    }
+
+    function toggleHalftone() {
+      state.halftonePreview = !state.halftonePreview;
+      document.getElementById('halftoneToggle').textContent = 'Halftone: ' + (state.halftonePreview ? 'ON' : 'OFF');
+      document.getElementById('halftoneToggle').style.borderColor = state.halftonePreview ? 'var(--green)' : '';
+      updateCanvas();
+    }
+
+    // ===== EROSION =====
+    function applyErosion(srcCanvas, px) {
+      if (px === 0) return srcCanvas;
+      const off = document.createElement('canvas');
+      off.width = srcCanvas.width;
+      off.height = srcCanvas.height;
+      const octx = off.getContext('2d');
+      octx.drawImage(srcCanvas, 0, 0);
+      const id = octx.getImageData(0, 0, off.width, off.height);
+      const data = id.data;
+      const out = new Uint8ClampedArray(data);
+      const w = off.width, h = off.height;
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const i = (y * w + x) * 4;
+          if (data[i + 3] > 0) {
+            let erode = false;
+            for (let dy = -px; dy <= px; dy++) {
+              for (let dx = -px; dx <= px; dx++) {
+                const nx = x + dx, ny = y + dy;
+                if (nx < 0 || ny < 0 || nx >= w || ny >= h || data[((ny * w + nx) * 4) + 3] === 0) {
+                  erode = true; break;
+                }
+              }
+              if (erode) break;
+            }
+            if (erode) out[i + 3] = 0;
+          }
+        }
+      }
+      const outId = new ImageData(out, w, h);
+      octx.putImageData(outId, 0, 0);
+      return off;
+    }
+
+    function downloadCanvas(c, filename) {
+      c.toBlob(blob => {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        a.click();
+      }, 'image/png');
+    }
+
+    // ===== UTILS =====
+    function setApiStatus(s) {
+      const dot = document.getElementById('apiDot');
+      const txt = document.getElementById('apiStatusText');
+      if (s === 'ready') { dot.style.background = 'var(--green)'; txt.textContent = 'HF API · valmis'; }
+      else if (s === 'loading') { dot.style.background = 'var(--yellow)'; txt.textContent = 'HF API · generoidaan...'; }
+      else { dot.style.background = 'var(--red)'; txt.textContent = 'HF API · virhe'; }
+    }
+
+    function showToast(msg, type) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.style.borderColor = type === 'error' ? 'var(--red)' : type === 'warn' ? 'var(--yellow)' : 'var(--green)';
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 3000);
+    }
+
+    // ===== COLOR SEPARATION =====
+
+    // K-means clustering on image pixels
+    // Returns array of {r,g,b} cluster centroids
+    function kMeansClustering(pixels, k, iterations = 12) {
+      if (pixels.length === 0) return [];
+      k = Math.min(k, pixels.length);
+
+      // Init centroids by picking evenly spaced pixels (better than random)
+      let centroids = [];
+      const step = Math.floor(pixels.length / k);
+      for (let i = 0; i < k; i++) {
+        const p = pixels[i * step];
+        centroids.push({ r: p[0], g: p[1], b: p[2] });
+      }
+
+      let assignments = new Int32Array(pixels.length);
+
+      for (let iter = 0; iter < iterations; iter++) {
+        // Assign each pixel to nearest centroid
+        let changed = false;
+        for (let i = 0; i < pixels.length; i++) {
+          const [r, g, b] = pixels[i];
+          let best = 0, bestDist = Infinity;
+          for (let c = 0; c < centroids.length; c++) {
+            const dr = r - centroids[c].r;
+            const dg = g - centroids[c].g;
+            const db = b - centroids[c].b;
+            const dist = dr * dr + dg * dg + db * db;
+            if (dist < bestDist) { bestDist = dist; best = c; }
+          }
+          if (assignments[i] !== best) { assignments[i] = best; changed = true; }
+        }
+        if (!changed && iter > 0) break;
+
+        // Recompute centroids
+        const sums = Array.from({ length: k }, () => ({ r: 0, g: 0, b: 0, n: 0 }));
+        for (let i = 0; i < pixels.length; i++) {
+          const c = assignments[i];
+          sums[c].r += pixels[i][0];
+          sums[c].g += pixels[i][1];
+          sums[c].b += pixels[i][2];
+          sums[c].n++;
+        }
+        for (let c = 0; c < k; c++) {
+          if (sums[c].n > 0) {
+            centroids[c] = {
+              r: Math.round(sums[c].r / sums[c].n),
+              g: Math.round(sums[c].g / sums[c].n),
+              b: Math.round(sums[c].b / sums[c].n),
+            };
+          }
+        }
+      }
+
+      // Return centroids with their pixel assignments
+      return centroids.map((c, ci) => ({
+        ...c,
+        indices: assignments.reduce((acc, a, i) => { if (a === ci) acc.push(i); return acc; }, [])
+      }));
+    }
+
+    // Human-readable colour name approximation
+    function colorName(r, g, b) {
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      const lum = (r * 0.299 + g * 0.587 + b * 0.114);
+      if (max - min < 25) {
+        if (lum < 40) return 'musta';
+        if (lum > 215) return 'valkoinen';
+        return 'harmaa';
+      }
+      if (r > g && r > b) return g > b * 1.3 ? 'keltainen' : b > g * 1.2 ? 'magenta' : 'punainen';
+      if (g > r && g > b) return r > b * 1.2 ? 'keltavihreä' : 'vihreä';
+      if (b > r && b > g) return r > g * 1.2 ? 'violetti' : 'sininen';
+      if (r > 180 && g > 100 && b < 80) return 'oranssi';
+      return 'väri';
+    }
+
+    function rgbToHex2(r, g, b) {
+      return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+    }
+
+    async function analyzeColors() {
+      if (!state.mainImage) return;
+
+      const btn = document.getElementById('analyzeBtn');
+      btn.disabled = true;
+      document.getElementById('analyzeBtnContent').innerHTML = '<span class="spinner"></span> Analysoidaan...';
+      document.getElementById('zipExportBtn').disabled = true;
+      state.colorLayers = null;
+
+      // Small yield to let UI update before heavy computation
+      await new Promise(r => setTimeout(r, 30));
+
+      const k = parseInt(document.getElementById('sepColors').value);
+
+      // Get processed image at preview size (faster analysis)
+      const pw = parseFloat(document.getElementById('adminW').value) || 30;
+      const analysisSize = 300; // analyse at 300px wide for speed
+      const ar = state.mainImage.naturalWidth / state.mainImage.naturalHeight;
+      const aW = analysisSize;
+      const aH = Math.round(analysisSize / ar);
+
+      const processed = getProcessedImage(state.mainImage, aW, aH);
+      const pctx = processed.getContext('2d');
+      const id = pctx.getImageData(0, 0, aW, aH);
+      const data = id.data;
+
+      // Collect non-transparent pixels
+      const pixels = [];
+      const pixelPositions = []; // [x, y] for each pixel
+      for (let i = 0; i < data.length; i += 4) {
+        if (data[i + 3] < 20) continue;
+        pixels.push([data[i], data[i + 1], data[i + 2]]);
+        const idx = i / 4;
+        pixelPositions.push([idx % aW, Math.floor(idx / aW)]);
+      }
+
+      if (pixels.length === 0) {
+        showToast('Ei pikseleitä analysoitavana — poista tausta ensin', 'warn');
+        btn.disabled = false;
+        document.getElementById('analyzeBtnContent').textContent = '🔍 Analysoi värit';
+        return;
+      }
+
+      // Run k-means
+      const clusters = kMeansClustering(pixels, k);
+
+      // Sort by pixel count descending
+      clusters.sort((a, b) => b.indices.length - a.indices.length);
+
+      // Build colorLayers — store centroid and pixel positions (scaled up to full res later)
+      state.colorLayers = clusters.map((c, i) => ({
+        r: c.r, g: c.g, b: c.b,
+        hex: rgbToHex2(c.r, c.g, c.b),
+        name: colorName(c.r, c.g, c.b),
+        count: c.indices.length,
+        pct: Math.round(c.indices.length / pixels.length * 100),
+        // Store pixel positions at analysis scale
+        positions: c.indices.map(idx => pixelPositions[idx]),
+        analysisW: aW,
+        analysisH: aH,
+      }));
+
+      renderColorPreview();
+
+      btn.disabled = false;
+      document.getElementById('analyzeBtnContent').textContent = '🔍 Analysoi uudelleen';
+      document.getElementById('zipExportBtn').disabled = false;
+      showToast(`${clusters.length} värikerrosta tunnistettu`);
+    }
+
+    function renderColorPreview() {
+      const wrap = document.getElementById('colorLayerPreview');
+      const swatches = document.getElementById('colorLayerSwatches');
+
+      if (!state.colorLayers) {
+        wrap.style.display = 'none';
+        return;
+      }
+
+      wrap.style.display = 'block';
+      swatches.innerHTML = state.colorLayers.map((layer, i) => `
+    <div style="display:flex;align-items:center;gap:5px;width:100%;padding:3px 0;border-bottom:1px solid var(--border);">
+      <div style="width:20px;height:20px;border-radius:3px;background:${layer.hex};border:1px solid var(--border2);flex-shrink:0;"></div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:11px;color:var(--text);font-family:'DM Mono',monospace;">${layer.name}</div>
+        <div style="font-size:10px;color:var(--text3);">${layer.hex} · ${layer.pct}% pikselistä</div>
+      </div>
+      <div style="font-size:10px;color:var(--text3);font-family:'DM Mono',monospace;">L${i + 1}</div>
+    </div>
+  `).join('');
+    }
+
+    async function exportColorLayers() {
+      if (!state.colorLayers || !state.mainImage) return;
+
+      const btn = document.getElementById('zipExportBtn');
+      btn.disabled = true;
+      document.getElementById('zipBtnContent').innerHTML = '<span class="spinner"></span> Luodaan ZIP...';
+
+      await new Promise(r => setTimeout(r, 30));
+
+      // Render at full export resolution
+      const pw = parseFloat(document.getElementById('adminW').value) || 30;
+      const ph = parseFloat(document.getElementById('adminH').value) || 36;
+      const outW = Math.round(pw * 300 / 2.54);
+      const outH = Math.round(ph * 300 / 2.54);
+
+      const sizeCm = parseFloat(document.getElementById('sizeSlider').value);
+      const pxPerCm = outW / pw;
+      const imgPx = sizeCm * pxPerCm;
+      const ar = state.mainImage.naturalWidth / state.mainImage.naturalHeight;
+      const imgW = imgPx;
+      const imgH = imgPx / ar;
+      const rot = parseFloat(document.getElementById('rotSlider').value) * Math.PI / 180;
+      const posXPct = parseFloat(document.getElementById('posX').value) / 100;
+      const posYPct = parseFloat(document.getElementById('posY').value) / 100;
+      const areaW = outW * 0.72;
+      const areaH = outH * 0.72;
+      const areaX = (outW - areaW) / 2;
+      const areaY = outH * 0.14;
+      const cx = areaX + areaW * posXPct;
+      const cy = areaY + areaH * posYPct;
+
+      // Get full-res processed image
+      const processed = getProcessedImage(state.mainImage, imgW, imgH);
+      const pctx = processed.getContext('2d');
+      const srcData = pctx.getImageData(0, 0, processed.width, processed.height).data;
+
+      const zip = new JSZip();
+      const folder = zip.folder('vаrikerrokset');
+
+      for (let li = 0; li < state.colorLayers.length; li++) {
+        const layer = state.colorLayers[li];
+
+        // Create full-res output canvas
+        const layerCanvas = document.createElement('canvas');
+        layerCanvas.width = outW;
+        layerCanvas.height = outH;
+        const lctx = layerCanvas.getContext('2d');
+
+        // Draw processed image transformed into position, then recolour to cluster colour
+        // We do this by drawing to a temp canvas, reading pixels, and replacing with centroid colour
+        const tmpCanvas = document.createElement('canvas');
+        tmpCanvas.width = outW;
+        tmpCanvas.height = outH;
+        const tctx = tmpCanvas.getContext('2d');
+        tctx.save();
+        tctx.translate(cx, cy);
+        tctx.rotate(rot);
+        tctx.drawImage(processed, -imgW / 2, -imgH / 2, imgW, imgH);
+        tctx.restore();
+
+        const tmpId = tctx.getImageData(0, 0, outW, outH);
+        const td = tmpId.data;
+        const outId = lctx.createImageData(outW, outH);
+        const od = outId.data;
+
+        const { r: cr, g: cg, b: cb } = layer;
+        const tolerance = 60; // colour matching tolerance for cluster assignment
+
+        for (let i = 0; i < td.length; i += 4) {
+          if (td[i + 3] < 20) continue; // skip transparent
+
+          const pr = td[i], pg = td[i + 1], pb = td[i + 2];
+
+          // Find which cluster this pixel belongs to
+          let bestCluster = 0, bestDist = Infinity;
+          for (let c = 0; c < state.colorLayers.length; c++) {
+            const cl = state.colorLayers[c];
+            const dr = pr - cl.r, dg = pg - cl.g, db = pb - cl.b;
+            const dist = dr * dr + dg * dg + db * db;
+            if (dist < bestDist) { bestDist = dist; bestCluster = c; }
+          }
+
+          if (bestCluster === li) {
+            // This pixel belongs to this layer — paint with centroid colour
+            od[i] = cr;
+            od[i + 1] = cg;
+            od[i + 2] = cb;
+            od[i + 3] = td[i + 3]; // preserve alpha
+          }
+          // other pixels stay transparent (od initialised to 0)
+        }
+
+        lctx.putImageData(outId, 0, 0);
+
+        // Aja halftone tähän kerrokseen jos se on päällä
+        let finalLayerCanvas = layerCanvas;
+        if (state.halftonePreview) {
+          const halftoneCell = parseInt(document.getElementById('halftoneCell').value);
+          const halftoneAngle = parseInt(document.getElementById('halftoneAngle').value);
+          finalLayerCanvas = applyHalftoneAlphaSafe(layerCanvas, halftoneCell, halftoneAngle);
+        }
+
+        // Convert canvas to blob and add to zip
+        const blob = await new Promise(res => finalLayerCanvas.toBlob(res, 'image/png'));
+        const buf = await blob.arrayBuffer();
+        const name = `L${String(li + 1).padStart(2, '0')}_${layer.name}_${layer.hex.replace('#', '')}.png`;
+        folder.file(name, buf);
+      }
+
+      // Also add a composite "all layers" reference image
+      const compositeCanvas = document.createElement('canvas');
+      compositeCanvas.width = outW;
+      compositeCanvas.height = outH;
+      const cctx = compositeCanvas.getContext('2d');
+      cctx.save();
+      cctx.translate(cx, cy);
+      cctx.rotate(rot);
+      cctx.drawImage(processed, -imgW / 2, -imgH / 2, imgW, imgH);
+      cctx.restore();
+      const compositeBlob = await new Promise(res => compositeCanvas.toBlob(res, 'image/png'));
+      folder.file('_yhdistetty_referenssi.png', await compositeBlob.arrayBuffer());
+
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(zipBlob);
+      a.download = 'printgen_vариkerrokset.zip';
+      a.click();
+
+      btn.disabled = false;
+      document.getElementById('zipBtnContent').textContent = '↓ Lataa värikerrokset (ZIP)';
+      showToast(`ZIP valmis — ${state.colorLayers.length} kerrosta`);
+    }
+
+    // Initial render
+    loadFeatureStates();
+    applyFeatureToggles();
+    initCollapsibleSections();
+    updateCanvas();
+  </script>
+</body>
+
+</html>
