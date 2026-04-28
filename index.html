@@ -1587,12 +1587,12 @@
   </div>
 
     <!-- RIGHT PANEL: Layout steps 6–8 -->
-    <div class="panel panel-right" style="display:flex;flex-direction:column;overflow:hidden;height:100%">
+    <div class="panel panel-right">
 
       <!-- Asemointi panel (no tabs needed — base preview moved to center) -->
 
       <!-- TAB: ASEMOINTI -->
-      <div id="tabLayout" style="display:flex;flex-direction:column;overflow-y:auto;flex:1;min-height:0">
+      <div id="tabLayout">
 
         <!-- Shirt canvas -->
         <div style="padding:12px;background:var(--surface2);border-bottom:1px solid var(--border);flex-shrink:0">
@@ -3167,12 +3167,22 @@
         }
       `;
 
-      let _gl=null, _progs={}, _buf=null, _fbo=null, _fboW=0, _fboH=0;
+      let _gl=null, _glCanvas=null, _progs={}, _buf=null, _fbo=null, _fboW=0, _fboH=0;
 
       function getGL(w,h){
-        if(_gl && _gl.canvas.width===w && _gl.canvas.height===h) return _gl;
-        const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
-        _gl=cv.getContext('webgl',{premultipliedAlpha:false,preserveDrawingBuffer:true});
+        // Reuse a single canvas + context. Only resize when needed.
+        if(!_glCanvas){
+          _glCanvas=document.createElement('canvas');
+        }
+        if(_glCanvas.width!==w || _glCanvas.height!==h){
+          _glCanvas.width=w; _glCanvas.height=h;
+        }
+        if(_gl) {
+          // Reuse existing context — DO NOT create new one (limit ~8-16 per page)
+          _gl.viewport(0,0,w,h);
+          return _gl;
+        }
+        _gl=_glCanvas.getContext('webgl',{premultipliedAlpha:false,preserveDrawingBuffer:true});
         if(!_gl) return null;
         _progs={};
         _buf=_gl.createBuffer();
