@@ -1703,7 +1703,7 @@
                 Tallentuu PNG-muodossa RGB-väriavaruudessa.
               </p>
             </div>
-            <button class="btn btn-primary" onclick="exportFiles()">
+            <button class="btn btn-primary" id="exportBtn" onclick="exportFiles()">
               <span>⬇ Vie DTF-tiedostot</span>
             </button>
             <p id="exportDesc" style="font-size:10px;color:var(--text3);margin-top:4px">
@@ -1722,6 +1722,18 @@
     </div><!-- end panel-right -->
 
   </div><!-- end main -->
+
+  <!-- Piilotetut placeholder-elementit ominaisuuksille jotka ovat osittain toteutettuja.
+       Estävät getElementById-kaatumisia. Voidaan poistaa kun ominaisuudet on viety loppuun. -->
+  <div style="display:none" aria-hidden="true">
+    <button id="analyzeBtn" disabled><span id="analyzeBtnContent">🔍 Analysoi värit</span></button>
+    <button id="zipExportBtn" disabled><span id="zipBtnContent">↓ Lataa värikerrokset (ZIP)</span></button>
+    <input id="sepColors" type="number" value="6">
+    <div id="colorLayerPreview"></div>
+    <div id="colorLayerSwatches"></div>
+    <div id="maskScaleWrap"></div>
+    <button id="previewShapeBtn">Esikatselu muodossa</button>
+  </div>
 
   <script>
     const canvas = document.getElementById('mainCanvas');
@@ -2892,8 +2904,10 @@
 
     // ===== EXPORT =====
     function updateExportBtn() {
-      document.getElementById('exportBtn').disabled = !state.hasImage;
-      document.getElementById('analyzeBtn').disabled = !state.hasImage;
+      const exportBtn = document.getElementById('exportBtn');
+      if (exportBtn) exportBtn.disabled = !state.hasImage;
+      const analyzeBtn = document.getElementById('analyzeBtn');
+      if (analyzeBtn) analyzeBtn.disabled = !state.hasImage;
     }
 
     function exportFiles() {
