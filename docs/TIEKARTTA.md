@@ -65,13 +65,13 @@ Muut mittaukset tukevat samaa:
   | 15 % | 0,44 | 0,37 | 0,32 | 0,28 | 0,25 | 0,22 | 0,20 | 0,19 mm |
 
 - Häviörajat osuvat samaan pistekokoon. 5 % katosi lähes kokonaan, mutta 25 ja 30 LPI:llä (Ø 0,26 / 0,21 mm) jäi hajanaisia pisteitä. 15 % katosi noin 50 LPI:stä ylöspäin (Ø 0,22 mm). Raja on noin 0,22–0,25 mm:n pisteessä, mikä vastaa kumppanin min dotia 0,25 mm. [päätelty]
-- Luvun 3 lause "kalibrointikartat on tehty samalla moottorilla kuin tuotanto" ei pidä tämän kartan osalta. Printgenin oma vienti piirtäisi samalla 15 %:n syötteellä 25 LPI:llä 0,14 mm:n pisteen, eli selvästi häviörajan alle. 5 %:n piste (Ø 0,047 mm ≈ 0,55 px 300 DPI:llä) ei piirry lainkaan.
+- Luvun 3 alkuperäinen oletus, että kalibrointikartat on tehty samalla moottorilla kuin tuotanto, ei pitänyt tämän kartan osalta (luku 3 korjattu). Printgenin oma vienti piirtäisi samalla 15 %:n syötteellä 25 LPI:llä 0,14 mm:n pisteen, eli selvästi häviörajan alle. 5 %:n piste (Ø 0,047 mm ≈ 0,55 px 300 DPI:llä) ei piirry lainkaan.
 - Vaihe A2 on edelleen tarpeen tuotantorasterin vuoksi, mutta koeajon datan tulkinta ei odota sitä.
 - Generaattorin lähdekoodi kannattaa tallentaa, jotta seuraavan kartan kaava voidaan tarkistaa koodista eikä tulosteesta.
 
 ## 3. Periaatteet, jotka ohjaavat järjestystä
 
-- **Mittalaitteen on oltava oikein ennen mittausta.** Kalibrointikartat on tehty samalla moottorilla kuin tuotanto. Jos moottori piirtää väärän peiton, jokainen profiiliin luettu arvo on väärä.
+- **Mittalaitteen on oltava oikein ennen mittausta.** Profiiliin luettu arvo on vain niin hyvä kuin kartta, jolla se mitattiin. Max-LPI-haitari on tehty erillisellä karttatyökalulla, ja sen pistekaava on pinta-alakorjattu (vaihe 0, luku 2). Printgenin oma rasteri piirtää säde-kaavalla, joten se korjataan samaan (A2) ennen kuin profiilin rajoja sovelletaan sen vientiin.
 - **Contone on oletettu tuotantoreitti, AM-rasteri ilmaisullinen valinta.** Tämä on voimassa, kunnes vertailukoe (luku 6) osoittaa muuta.
 - **Kriittisellä polulla on vain se, mikä koskee kaikkea vientiä.** Erikoisreitit (kanavaerottelu, värikerrokset) korjataan tai piilotetaan myöhemmin.
 - **Fyysiset suureet millimetreinä, ei pikseleinä.** Pikseli on resoluution sivutuote.
@@ -101,7 +101,7 @@ Muut mittaukset tukevat samaa:
 
 ### Vaihe A2 — Rasterin sävyvaste ja rehelliset kartat
 
-**Miksi nyt:** Seuraavan koeajon data on käyttökelpoista vain, jos kartat piirtävät sen peiton, jonka ne ilmoittavat.
+**Miksi nyt:** Profiilin rajat (min dot, max LPI) mitataan pinta-alakorjatulla kartalla. Printgenin oma rasteri piirtää säde-kaavalla huomattavasti pienempiä pisteitä, joten rajat eivät päde sen vientiin ennen korjausta (luku 2, vaihe 0). Koeajon 2 contone vs. AM -vertailu tarvitsee myös korjatun rasterin.
 
 **Sisältö:**
 - Pinta-alakorjattu piste: peitto on lineaarinen tummuuteen nähden.
@@ -171,19 +171,20 @@ Vastaukset kirjataan lukuun 7. Kohdat 1–3 ratkaisevat vaiheen C laajuuden ja 6
 ## 5. Riippuvuudet
 
 ```
-Vaihe 0 ──► A2 ──► (koeajo 2) ──► D
+Vaihe 0 (valmis) ──► koeajon 1 tulkinta
+A2 ──► (koeajo 2) ──► D
 A1 ──────────────────────────────► C
 Selvitys ──► C:n laajuus, E:n tarve
 B ───────────────────────────────► C
 ```
 
-A1 ja vaihe 0 voidaan tehdä heti ja rinnakkain. Selvitys kulkee koko ajan taustalla.
+Vaihe 0 on valmis: koeajon 1 kynnykset ovat pinta-alapeittoa, eikä niiden tulkinta odota A2:ta. A1 ja A2 voidaan aloittaa heti. Selvitys kulkee koko ajan taustalla.
 
 ## 6. Seuraava koeajo
 
-Ajetaan, kun A2 on valmis.
+Ajetaan, kun A2 on valmis, koska kohta 3 vertaa Printgenin omaa rasteria. Kohdat 1, 2 ja 4 tehdään erillisellä karttatyökalulla, joten ne eivät sinänsä odota A2:ta.
 
-1. **Max-LPI-haitari uudelleen** korjatulla pistekaavalla. Lisätään 10 %:n ja 20 %:n sarakkeet, koska kynnys osuu niiden väliin.
+1. **Max-LPI-haitari uudelleen.** Pistekaava on jo oikein (vaihe 0). Lisätään 10 %:n ja 20 %:n sarakkeet, koska kynnys osuu niiden väliin.
 2. **Tiheysporras** tummalle paidalle **pelkällä valkoisella kanavalla**.
 3. **Contone vs. AM -vertailu:** sama harmaaliuku kahdesti samalla arkilla, kerran contonena (RIP rasteroi) ja kerran Printgenin AM-rasterina 30 LPI:llä. Tämä ratkaisee, tuoko Printgenin oma rasteri DTF:ssä lisäarvoa vai onko se puhtaasti tyylikeino.
 4. **Min dot × choke -matriisi** (jos RIPin choke on säädettävissä): pienet erilliset pisteet (0,2 / 0,3 / 0,4 / 0,5 mm) kahdella choke-arvolla.
@@ -198,7 +199,8 @@ Jokaisesta filmistä kirjataan RIPin asetukset ennen ajoa.
 | Valkoisen generointi ja choke | D (min dot) | avoin |
 | Hyväksyykö RIP `/Separation White` | C | avoin |
 | Kuvien 5 ja 6 filmin asetukset | koeajon tulkinta | avoin |
-| Karttageneraattorin pistekaava | koeajon tulkinta | vaihe 0 |
+| Karttageneraattorin pistekaava | koeajon tulkinta | ratkaistu (vaihe 0): pinta-ala ∝ tummuus, ks. luku 2 |
+| Karttageneraattorin lähdekoodi talteen | seuraavien karttojen tarkistus koodista | avoin |
 | Tehtiinkö painotalon "your file" -testit Printgenillä | viitearvojen tulkinta | avoin |
 
 ## 8. CLAUDE.md:n korjaukset
