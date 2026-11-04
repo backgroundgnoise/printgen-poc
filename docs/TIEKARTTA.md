@@ -42,6 +42,8 @@ CODEMAPin keskeiset löydökset:
 
 **Miten selvitettiin.** Karttageneraattorin lähdekoodia ei löytynyt repositoriosta, sen historiasta eikä koeajon tiedostoista. Kaava pääteltiin mittaamalla max-LPI-haitarin paitaskannauksesta (600 DPI): pisteväli autokorrelaatiolla, fyysinen piste kynnysarvolla (puoliväli kankaan ja musteen välillä), lisäksi keskitummuudesta Murray–Davies-peitto. Kartan alateksti kertoo, että se on erillinen profiilin `raster.maxLpi`-mittaustyökalu, joka viittaa Printgeniin "työkaluna" (Printgen kvantisoi solun 300 DPI:hin, portaat 25, 30, 33, 38, 43, 50, 60, 75). Kartta ei siis ole Printgenin vientiä. [päätelty]
 
+**Mittaustyökalu.** Mittaus on toistettavissa työkalulla `tools/mittaa_skannaus.py` (numpy ja Pillow). Sille annetaan skannaus ja kahden näkyvän ruudun keskipisteet, esim. `--piste 25:90:X,Y`. `--nayta` piirtää mittausalueet tarkistuskuvaan, ja `--paita`/`--umpi` lisäävät Murray–Davies-peiton ja tilamerkinnän (hävinnyt / umpeutunut / osin). Työkalu toistaa tämän luvun luvut. Pisteen halkaisija lasketaan siinä peitosta, eikä yksittäisiä pisteitä mitata. Tilamerkinnän rajat ovat heuristiikkaa, eikä niitä ole verrattu silmämääräiseen arvioon. Skannauksia ei tallenneta repoon.
+
 **Vahvistus koodista (2026-11-04).** Generaattori on nyt tallessa: `tools/kalibrointikartat.py`. Se on koottu alkuperäisistä skripteistä. Piirtologiikka on skriptin mukaan alkuperäinen, mutta tulosteita ei ole verrattu bitintarkasti. Pisteen säde on R = c · √(t / π) eli ympyrän ala = t · c², eikä solua c = DPI / LPI pyöristetä. Mittauksesta päätelty pinta-alamalli pitää siis paikkansa, ja kartan rivit ovat todellisia LPI-arvoja. [vahvistettu] koodista
 
 **Laskelma 25 LPI:llä** (solu 25,4 / 25 = 1,016 mm):
