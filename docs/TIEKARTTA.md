@@ -42,6 +42,8 @@ CODEMAPin keskeiset löydökset:
 
 **Miten selvitettiin.** Karttageneraattorin lähdekoodia ei löytynyt repositoriosta, sen historiasta eikä koeajon tiedostoista. Kaava pääteltiin mittaamalla max-LPI-haitarin paitaskannauksesta (600 DPI): pisteväli autokorrelaatiolla, fyysinen piste kynnysarvolla (puoliväli kankaan ja musteen välillä), lisäksi keskitummuudesta Murray–Davies-peitto. Kartan alateksti kertoo, että se on erillinen profiilin `raster.maxLpi`-mittaustyökalu, joka viittaa Printgeniin "työkaluna" (Printgen kvantisoi solun 300 DPI:hin, portaat 25, 30, 33, 38, 43, 50, 60, 75). Kartta ei siis ole Printgenin vientiä. [päätelty]
 
+**Vahvistus koodista (2026-11-04).** Generaattori on nyt tallessa: `tools/kalibrointikartat.py`. Se on koottu alkuperäisistä skripteistä. Piirtologiikka on skriptin mukaan alkuperäinen, mutta tulosteita ei ole verrattu bitintarkasti. Pisteen säde on R = c · √(t / π) eli ympyrän ala = t · c², eikä solua c = DPI / LPI pyöristetä. Mittauksesta päätelty pinta-alamalli pitää siis paikkansa, ja kartan rivit ovat todellisia LPI-arvoja. [vahvistettu] koodista
+
 **Laskelma 25 LPI:llä** (solu 25,4 / 25 = 1,016 mm):
 
 | Sarake | Säde ∝ tummuus (Printgenin shader, max 0,92) | Pinta-ala ∝ tummuus | Mitattu paidalta |
@@ -56,6 +58,12 @@ Muut mittaukset tukevat samaa:
 - 15 %:n pisteen halkaisija suhteessa soluun oli 0,45 / 0,44 / 0,45 riveillä 25 / 30 / 35 LPI. Pinta-alamalli antaa 0,437, säde-malli 0,138.
 - Ero mallien välillä on peitossa noin kymmenkertainen, joten johtopäätös ei riipu mittaustarkkuudesta. Fyysisessä peitossa näkyy painon dot gain (+2–5 %-yksikköä). Murray–Davies-peitto on suurempi (15 % → noin 29 %, 50 % → 73–79 %), koska siihen sisältyy myös kankaan optinen dot gain.
 
+**90 %:n sarake on todellisuudessa noin 86 %.** [vahvistettu] koodista ja `--tarkista`-ajosta. Kun t > π/4 (78,5 %), säde ylittää puolisolun (R > c/2), ja naapuripisteet menevät päällekkäin. Kaava laskee päällekkäiset alueet kahteen kertaan, joten todellinen peitto jää otsikkoa pienemmäksi. 90 %:lla R = 0,535 c, ja geometrisesti laskettu peitto on 86,4 %. `python3 tools/kalibrointikartat.py --tarkista` antaa 86,2 % (25 LPI) … 84,8 % (75 LPI). Muut sarakkeet pysyvät ±2 %-yksikön sisällä. Suurimmat poikkeamat ovat 5 % → 6,3 % ja 15 % → 16,5 % 75 LPI:llä, todennäköisesti pienten pisteiden reunojen antialiasoinnin vuoksi. [oletus]
+
+- Koeajon havainto "90 % on umpimusta" koskee siis noin 86 %:n peittoa.
+- Kartan "90" ei ole sama kuin kumppanin max dot 90 % (pinta-ala).
+- 70 %:n sarake on kunnossa (69–70 %), joten havainto 70 %:n tukkeutumisesta pätee sellaisenaan.
+
 **Seuraukset:**
 - Kynnykset luetaan pinta-alapeittona. Pisteen halkaisija pinta-alamallilla:
 
@@ -67,7 +75,7 @@ Muut mittaukset tukevat samaa:
 - Häviörajat osuvat samaan pistekokoon. 5 % katosi lähes kokonaan, mutta 25 ja 30 LPI:llä (Ø 0,26 / 0,21 mm) jäi hajanaisia pisteitä. 15 % katosi noin 50 LPI:stä ylöspäin (Ø 0,22 mm). Raja on noin 0,22–0,25 mm:n pisteessä, mikä vastaa kumppanin min dotia 0,25 mm. [päätelty]
 - Luvun 3 alkuperäinen oletus, että kalibrointikartat on tehty samalla moottorilla kuin tuotanto, ei pitänyt tämän kartan osalta (luku 3 korjattu). Printgenin oma vienti piirtäisi samalla 15 %:n syötteellä 25 LPI:llä 0,14 mm:n pisteen, eli selvästi häviörajan alle. 5 %:n piste (Ø 0,047 mm ≈ 0,55 px 300 DPI:llä) ei piirry lainkaan.
 - Vaihe A2 on edelleen tarpeen tuotantorasterin vuoksi, mutta koeajon datan tulkinta ei odota sitä.
-- Generaattorin lähdekoodi kannattaa tallentaa, jotta seuraavan kartan kaava voidaan tarkistaa koodista eikä tulosteesta.
+- Generaattorin lähdekoodi on tallessa (`tools/kalibrointikartat.py`), ja `--tarkista` laskee jokaisen ruudun todellisen peiton. Seuraavan kartan kaava tarkistetaan sillä eikä tulosteesta.
 
 ## 3. Periaatteet, jotka ohjaavat järjestystä
 
@@ -106,11 +114,12 @@ Muut mittaukset tukevat samaa:
 **Sisältö:**
 - Pinta-alakorjattu piste: peitto on lineaarinen tummuuteen nähden.
 - Max dot pinta-alana (esim. 90 % = kumppanin arvo), ei säteenä.
+- Päällekkäisyyskorjaus: kun peitto ylittää π/4 (78,5 %), säde ratkaistaan niin, että ympyrän ja solun leikkauksen ala on t · c², eikä niin, että πR² = t · c². Täysi peitto saavutetaan, kun R = c / √2. **Korjaus koskee myös karttageneraattoria** (`tools/kalibrointikartat.py`), jonka 90 %:n sarake on nyt noin 86 % (luku 2).
 - LPI-kvantisointi näkyviin: UI ja kartat näyttävät todellisen LPI:n (`300 / round(300/LPI)`), ei pyydettyä.
 - Pohjan solun alkuarvo korjataan vastaamaan slideria (`baseHalftoneCell` 10 px vs. 45 LPI).
 - Värikerroksen ja pohjan oletuskulma yhtenäistetään, tai ero perustellaan.
 
-**Valmis kun:** Selainkokeessa harmaa 128 peittää noin 50 % solusta, ja kartan jokaisen sarakkeen mitattu peitto vastaa otsikkoaan ±2 %-yksikön tarkkuudella.
+**Valmis kun:** Selainkokeessa harmaa 128 peittää noin 50 % solusta, ja kartan jokaisen sarakkeen mitattu peitto vastaa otsikkoaan ±2 %-yksikön tarkkuudella. Generaattorin osalta mittari on `python3 tools/kalibrointikartat.py --tarkista`, jonka suurin poikkeama on nyt 5,2 %-yksikköä (90 %, 75 LPI).
 
 ### Selvitys (rinnakkain, ei koodia)
 
@@ -200,7 +209,7 @@ Jokaisesta filmistä kirjataan RIPin asetukset ennen ajoa.
 | Hyväksyykö RIP `/Separation White` | C | avoin |
 | Kuvien 5 ja 6 filmin asetukset | koeajon tulkinta | avoin |
 | Karttageneraattorin pistekaava | koeajon tulkinta | ratkaistu (vaihe 0): pinta-ala ∝ tummuus, ks. luku 2 |
-| Karttageneraattorin lähdekoodi talteen | seuraavien karttojen tarkistus koodista | avoin |
+| Karttageneraattorin lähdekoodi talteen | seuraavien karttojen tarkistus koodista | ratkaistu: `tools/kalibrointikartat.py` (`--tarkista`) |
 | Tehtiinkö painotalon "your file" -testit Printgenillä | viitearvojen tulkinta | avoin |
 
 ## 8. CLAUDE.md:n korjaukset
