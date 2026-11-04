@@ -31,6 +31,7 @@ Alla oleva osa on kirjoitettu keskusteluissa tehtyjen päätösten pohjalta. Koo
 
 ## Työtavat
 
+- **Tiekartta:** Lue `docs/TIEKARTTA.md` ennen työn aloittamista; työ etenee sen vaiheiden mukaan.
 - **Kieli:** vastaa käyttäjälle suomeksi. Tekniset termit englanniksi sulkeissa, kun ne ovat työkalun valikoissa tai koodissa.
 - **Käyttäjä ei ole JavaScript-ekspertti**, mutta ymmärtää logiikkaa ja arkkitehtuuria hyvin (tausta node-pohjaisissa ympäristöissä). Selitä *miksi* ennen *mitä*.
 - **Suunnittelu ennen koodia.** Trade-offit, vaihtoehdot, liukusäätimien asteikot ja parametrien yksiköt päätetään yhdessä ennen toteutusta. Esitä suunnitelma ja odota hyväksyntää ennen kuin muokkaat koodia.
