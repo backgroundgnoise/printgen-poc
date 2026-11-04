@@ -142,11 +142,11 @@ Mittari: `tools/alpha_selainkoe.js` (CODEMAPin liite). Tulokset kirjataan liitte
 
 Kysytään painotalon yhteyshenkilöiltä:
 
-1. RIP-ohjelmiston nimi ja versio (CADlink?)
+1. RIP-ohjelmiston nimi ja versio (CADlink?) (osin vastattu 2026-11-04, ks. luku 7)
 2. Rasterointitila (stokastinen tai error diffusion vai AM) ja tulostusresoluutio
 3. Valkoisen generointitapa (automaattinen vai tiedostosta) ja choke-asetus
 4. Millä asetuksilla kukin koeajon filmi ajettiin, erityisesti kuvien 5 ja 6 filmi
-5. Hyväksyykö RIP PDF:n `/Separation White` -kanavan suoraan
+5. Hyväksyykö RIP PDF:n `/Separation White` -kanavan suoraan (osin vastattu 2026-11-04, ks. luku 7)
 
 Vastaukset kirjataan lukuun 7. Kohdat 1–3 ratkaisevat vaiheen C laajuuden ja 600 DPI:n tarpeen.
 
@@ -175,7 +175,7 @@ Vastaukset kirjataan lukuun 7. Kohdat 1–3 ratkaisevat vaiheen C laajuuden ja 6
 
 **Valmis kun:** Acrobatin Output Preview näyttää White-separaation ja overprintin oikein, ja koeajo RIPissä tuottaa odotetun tuloksen.
 
-**Laajuus riippuu selvityksestä:** jos RIP vaatii valmiiksi rasteroidun tiedoston, A2:n laatu tulee mukaan PDF:ään, ja vaihe laajenee.
+**Laajuus riippuu selvityksestä:** jos RIP vaatii valmiiksi rasteroidun tiedoston, A2:n laatu tulee mukaan PDF:ään, ja vaihe laajenee. (2026-11-04) Kumppanin standardissa on sekä contone- että valmiiksi rasteroitu tila. Printgenin PDF-vienti tukee molempia, joten A2:n rasterin laatu tulee rasteritilassa PDF:n mukaan.
 
 ### Vaihe D — Rasteri ilmaisullisena valintana, profiilirajoilla
 
@@ -221,9 +221,9 @@ Jokaisesta filmistä kirjataan RIPin asetukset ennen ajoa.
 
 | Kysymys | Vaikuttaa | Tila |
 |---|---|---|
-| RIPin nimi ja rasterointitila | C, E | avoin |
+| RIPin nimi ja rasterointitila | C, E | osin: CADlink (kumppanin testimuistio 2.11.2026). Rasterointitila avoin. Varmistettava, onko sama kone kuin Printgenin koeajossa. |
 | Valkoisen generointi ja choke | D (min dot) | avoin |
-| Hyväksyykö RIP `/Separation White` | C | avoin |
+| Hyväksyykö RIP `/Separation White` | C | ratkaistu: toimii CADlinkissä (kumppanin painotestit 20.10.–2.11.2026) |
 | Kuvien 5 ja 6 filmin asetukset | koeajon tulkinta | avoin |
 | Karttageneraattorin pistekaava | koeajon tulkinta | ratkaistu (vaihe 0): pinta-ala ∝ tummuus, ks. luku 2 |
 | Karttageneraattorin lähdekoodi talteen | seuraavien karttojen tarkistus koodista | ratkaistu: `tools/kalibrointikartat.py` (`--tarkista`) |

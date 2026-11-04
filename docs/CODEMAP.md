@@ -471,6 +471,13 @@ Vain arvio. Viitetiedoston rakenne CLAUDE.md:n mukaan: RGB + SMask, valkoinen om
 ### 7.3 Isoimmat epävarmuudet
 
 1. **Rasteroiko RIP itse?** Viitteen min dot 0,25 mm, max dot 90 % ja kulma 22,5° voivat olla RIPin rasteriasetuksia. Jos RIP rasteroi, PDF:ään viedään contone-RGB ja contone-valkoinen, eikä sovelluksen halftone-polkua käytetä PDF:ssä lainkaan. Jos taas tiedoston pitää olla valmiiksi rasteroitu, rasterin laatuongelmat (6.4, 6.5, 8.1) tulevat PDF:n mukana. **Tämä kysymys ratkaisee suurimman osan työmäärästä.**
+
+   > **Vastaus (2026-11-04):** Kumppanin referenssitiedostoissa min dot, max dot
+   > ja kulma ovat tiedoston asetuksia, eivät RIPin. Standardissa on kaksi tilaa:
+   > contone, jonka RIP rasteroi, ja rasteritila, jossa rasteri on tehty tiedostoon
+   > valmiiksi. PDF-vienti tarvitsee molemmat, joten rasteritilassa kohtien 6.4,
+   > 6.5 ja 8.1 laatuongelmat tulevat PDF:n mukaan. RIP on CADlink, ja se hyväksyy
+   > /Separation /White -kanavan (ks. TIEKARTTA luku 7).
 2. **Muisti 600 DPI:llä.** Tulostusala 30 × 36 cm on 7087 × 8504 px ≈ 60 Mpx ≈ 240 Mt RGBA-dataa canvasta kohden. `exportFiles` pitää samanaikaisesti muistissa noin 10 täysikokoista canvasta (`colorCanvas`, `shapeCanvas`, `combinedCanvas`, `erodedSource`, `baseCanvas`, 3–4 kanavaa ja jokaisen `to2D`-kopio), mikä tekee yli 2 Gt. Lisäksi WebGL:n `MAX_TEXTURE_SIZE` on monella GPU:lla 8192 (< 8504), ja Safarilla on omat canvas-muistirajansa. 300 DPI:llä sama on noin 15 Mpx (~60 Mt / canvas).
 3. **Tulkitseeko RIP valkoisen kanavan harmaat suhteellisena peittona?** (CLAUDE.md:n porraskiilatesti.)
 
