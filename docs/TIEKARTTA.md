@@ -112,7 +112,7 @@ Muut mittaukset tukevat samaa:
 **Valittu ratkaisu (2026-11-04):** vaihtoehto A eli blendaus pois. Kaikki passit piirtävät tyhjään puskuriin, joten blendauksella ei ole tehtävää. Toteutus kolmena committina:
 
 1. Blendaus pois (`261104_010`). Korjaa alphan neliöinnin ja värin tummumisen. Tehty.
-2. Tekstuurin suodatus `NEAREST`. Korjaa kuvan reunan pisteiden tummumisen (CODEMAP 8.1).
+2. Tekstuurin suodatus `NEAREST` (`261104_011`). Korjaa kuvan reunan pisteiden tummumisen (CODEMAP 8.1). Tehty.
 3. `webglcontextlost`-käsittely ja testikoukku `_GL._testLoseContext()`.
 
 Mittari: `tools/alpha_selainkoe.js` (CODEMAPin liite). Tulokset kirjataan liitteeseen jokaisen commitin jälkeen.

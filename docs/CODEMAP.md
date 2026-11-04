@@ -282,7 +282,7 @@ Vaihenumerot ovat 1, 2, 3, 4, 4.5, 5, 7, 7b ja 8. Vaihetta 6 ei ole.
 | Moduulin tila `_gl`, `_glCanvas`, `_progs`, `_buf`, `_fbo` | 3902 |
 | `getGL` (yksi jaettu konteksti; `BLEND` päällä, pois 261104_010) | 3904–3927 |
 | `getProg` | 3929–3938 |
-| `makeTex` (FLIP_Y) | 3940–3954 |
+| `makeTex` (FLIP_Y; suodatus `LINEAR`, `NEAREST` 261104_011) | 3940–3954 |
 | `setupQuad` | 3956–3963 |
 | `setUni` | 3965–3971 |
 | `to2D` | 3973–3978 |
@@ -493,7 +493,7 @@ Vain arvio. Viitetiedoston rakenne CLAUDE.md:n mukaan: RGB + SMask, valkoinen om
   - baseHalftone: valkoinen alpha 128 → (128,128,128,64), eli pohjatiedostoon tulee harmaata eikä valkoista
 
   Vaikutus kohdistuu pisteiden antialias-reunoihin, kuvan reunoihin, halo-poistoon ja choke-passiin. Läpinäkymättömät pikselit eivät muutu.
-- **Tekstuurin `LINEAR`-suodatus sekoittaa suoraa alphaa [koe].** `FS_COLOR` ottaa näytteen solun keskipisteestä, joka osuu yleensä pikselien väliin. Kuvan reunalla näyte sekoittuu läpinäkyvän (0,0,0,0) naapurin kanssa, jolloin reunan pisteen väri tummuu ja piste kasvaa. Koe 7 (`tools/alpha_selainkoe.js`): (200,100,50)-kiekon reunapisteistä 104/702 pikseliä poikkesi värisävyltään, enimmillään 55 yksikköä.
+- **Tekstuurin `LINEAR`-suodatus sekoittaa suoraa alphaa [koe]. [korjattu: 261104_011]** `makeTex` käyttää `NEAREST`-suodatusta, joten näyte on aina yksi pikseli. Erosion lukee pikselikeskuksista, joten sen tulos ei muuttunut. Alkuperäinen havainto: `FS_COLOR` ottaa näytteen solun keskipisteestä, joka osuu yleensä pikselien väliin. Kuvan reunalla näyte sekoittuu läpinäkyvän (0,0,0,0) naapurin kanssa, jolloin reunan pisteen väri tummuu ja piste kasvaa. Koe 7 (`tools/alpha_selainkoe.js`): (200,100,50)-kiekon reunapisteistä 104/702 pikseliä poikkesi värisävyltään, enimmillään 55 yksikköä.
 - **Kontekstin menetystä ei käsitellä** (`webglcontextlost`). `_gl` jää viittaamaan kuolleeseen kontekstiin, eikä tuloksesta saa virhettä. Riski kasvaa suurissa vienneissä.
 - **`precision mediump float`** kaikissa fragment shadereissa. Pikselikoordinaatit ovat viennissä tuhansia (esim. 4252). Jos GPU toteuttaa mediumpin oikeana fp16:na (mobiili, mahdollisesti osa Safari/Metal-poluista), ruudukon tarkkuus on suurilla koordinaateilla luokkaa 2–4 px. Työpöytä-Chromessa mediump on yleensä käytännössä highp. **[päätelty]**
 - **Yksi jaettu GL-canvas ja -konteksti** muuttaa kokoaan jokaisen kutsun mukana (esikatselu ↔ vienti). Turvallisuus nojaa siihen, että jokainen julkinen funktio palauttaa `to2D`-kopion.
@@ -562,15 +562,17 @@ Safarilla kokeita ei ajettu.
 
 Koe liitetään index.html:n konsoliin (ohje tiedoston alussa). Se tulostaa jokaisesta kohdasta PASS / FAIL / PUUTTUU. Toleranssi ±2 johtuu 2D-canvaksen premultiplied-tallennuksesta.
 
-| # | Koe | Lähtötaso (`ca3c6a9`) | Blendaus pois (`261104_010`) |
-|---|---|---|---|
-| 1 | `erode`, (200,100,50) alpha 128 | FAIL (100,52,24,64) | PASS (199,100,50,128) |
-| 2 | `erode`, alpha 255, sisäosa bitintarkka | PASS | PASS |
-| 3 | `colorHalftone`, musta alpha 64 / 128 / 255, keskus | FAIL 16 / 64 / 255 | PASS 64 / 128 / 255 |
-| 4 | `colorHalftone`, läpinäkymätön (200,100,50), sävy pisteiden reunoilla | FAIL 140/1582, ero ≤ 100 | PASS 0/1641, ero ≤ 2 |
-| 5 | `baseHalftone`, alpha 128, keskus | FAIL (128,128,128,64) | PASS (255,255,255,128) |
-| 6 | `baseHalftone`, kaikki pikselit valkoisia | FAIL 176/176 harmaata | PASS 0/176 |
-| 7 | reunus: (200,100,50)-kiekon reunapisteiden sävy | FAIL 112/638, ero ≤ 118 | FAIL 104/702, ero ≤ 55 (`LINEAR`-suodatus, 8.1) |
-| 8 | kontekstin menetys | PUUTTUU | PUUTTUU |
+| # | Koe | Lähtötaso (`ca3c6a9`) | Blendaus pois (`261104_010`) | `NEAREST` (`261104_011`) |
+|---|---|---|---|---|
+| 1 | `erode`, (200,100,50) alpha 128 | FAIL (100,52,24,64) | PASS (199,100,50,128) | PASS |
+| 2 | `erode`, alpha 255, sisäosa bitintarkka | PASS | PASS | PASS |
+| 3 | `colorHalftone`, musta alpha 64 / 128 / 255, keskus | FAIL 16 / 64 / 255 | PASS 64 / 128 / 255 | PASS |
+| 4 | `colorHalftone`, läpinäkymätön (200,100,50), sävy pisteiden reunoilla | FAIL 140/1582, ero ≤ 100 | PASS 0/1641, ero ≤ 2 | PASS 0/1641, ero ≤ 2 |
+| 5 | `baseHalftone`, alpha 128, keskus | FAIL (128,128,128,64) | PASS (255,255,255,128) | PASS |
+| 6 | `baseHalftone`, kaikki pikselit valkoisia | FAIL 176/176 harmaata | PASS 0/176 | PASS |
+| 7 | reunus: (200,100,50)-kiekon reunapisteiden sävy | FAIL 112/638, ero ≤ 118 | FAIL 104/702, ero ≤ 55 (`LINEAR`-suodatus, 8.1) | PASS 0/652, ero ≤ 2 |
+| 8 | kontekstin menetys | PUUTTUU | PUUTTUU | PUUTTUU |
 
 Ajettu: Chromium 152. Safari: ei vielä ajettu.
+
+Sävyvasteen peitto (6.4, alpha > 127) ei muuttunut `NEAREST`-suodatuksesta: 16 / 68 / 268 px.
