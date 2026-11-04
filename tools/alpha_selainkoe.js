@@ -136,21 +136,26 @@ async function alphaSelainkoe() {
     }
     // 8b: konteksti menetetään kesken passin → colorHalftone palauttaa CPU-tuloksen.
     {
-      _GL._testLoseContext({ kesken: true });
+      const toast = document.getElementById('toast');
+      if (toast) toast.textContent = '';
+      const ok = _GL._testLoseContext({ kesken: true });
       let tulos, virhe = null;
       try { tulos = _GL.colorHalftone(tasainen(40, 40, 0, 0, 0, 255), 20, 0, 0.92, 0); } catch (e) { virhe = e.message; }
       const a = tulos ? px(tulos, 10, 10)[3] : null;
-      kirjaa('8b', 'menetys kesken colorHalftonen → CPU-fallback, ei virhettä',
-        'canvas, keskus alpha 255', virhe ? 'virhe: ' + virhe : 'canvas, keskus alpha ' + a, !virhe && a === 255);
+      const ilmoitus = !!toast && /WebGL/.test(toast.textContent);
+      kirjaa('8b', 'menetys kesken colorHalftonen → CPU-fallback ja toast, ei virhettä',
+        'canvas, keskus alpha 255, toast',
+        virhe ? 'virhe: ' + virhe : `canvas, keskus alpha ${a}, toast ${ilmoitus ? 'kyllä' : 'ei'}`,
+        ok && !virhe && a === 255 && ilmoitus);
     }
     // 8c: konteksti menetetään kesken pohjan → selkeä virhe (pohjalla ei ole fallbackia).
     {
       await new Promise(r => setTimeout(r, 50));
-      _GL._testLoseContext({ kesken: true });
+      const ok = _GL._testLoseContext({ kesken: true });
       let virhe = null;
       try { keskus(); } catch (e) { virhe = e.message; }
       kirjaa('8c', 'menetys kesken baseHalftonen → heittää virheen',
-        'Error, viesti mainitsee WebGL:n', virhe ? 'Error: ' + virhe : 'ei virhettä', !!virhe && /WebGL/.test(virhe));
+        'Error, viesti mainitsee WebGL:n', virhe ? 'Error: ' + virhe : 'ei virhettä', ok && !!virhe && /WebGL/.test(virhe));
     }
     // 8d: menetyksen jälkeen moottori toipuu.
     {

@@ -113,7 +113,7 @@ Muut mittaukset tukevat samaa:
 
 1. Blendaus pois (`261104_010`). Korjaa alphan neliöinnin ja värin tummumisen. Tehty.
 2. Tekstuurin suodatus `NEAREST` (`261104_011`). Korjaa kuvan reunan pisteiden tummumisen (CODEMAP 8.1). Tehty.
-3. `webglcontextlost`-käsittely ja testikoukku `_GL._testLoseContext()`.
+3. `webglcontextlost`-käsittely ja testikoukku `_GL._testLoseContext()` (`261104_012`). Tehty.
 
 Mittari: `tools/alpha_selainkoe.js` (CODEMAPin liite). Tulokset kirjataan liitteeseen jokaisen commitin jälkeen.
 

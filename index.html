@@ -3278,15 +3278,22 @@
         tctx.drawImage(processed, ox, oy);
       }
 
-      const result = _GL.baseHalftone(
-        tmp,
-        state.baseHalftoneCell,
-        state.baseHalftoneAngle,
-        state.baseHalftoneDensity,
-        state.baseHalftoneDotScale,
-        state.baseHalftoneShape,
-        null
-      );
+      // Esikatselu ei saa kaatua pohjan virheeseen (ei WebGL:ää tai konteksti menetetty):
+      // pohja jää mustaksi, ja vienti näyttää saman virheen toastina.
+      let result = null;
+      try {
+        result = _GL.baseHalftone(
+          tmp,
+          state.baseHalftoneCell,
+          state.baseHalftoneAngle,
+          state.baseHalftoneDensity,
+          state.baseHalftoneDotScale,
+          state.baseHalftoneShape,
+          null
+        );
+      } catch (e) {
+        console.warn('Pohjan esikatselu:', e.message);
+      }
 
       const bctx = bc.getContext('2d');
       bctx.fillStyle = '#000';
@@ -3900,11 +3907,25 @@
       `;
 
       let _gl=null, _glCanvas=null, _progs={}, _buf=null, _fbo=null, _fboW=0, _fboH=0;
+      let _lostNotified=false, _testLoseNext=false;
+
+      // Nollaa moottorin tilan. Seuraava getGL luo uuden canvaksen ja kontekstin.
+      function resetGL(){
+        _gl=null; _glCanvas=null; _progs={}; _buf=null; _fbo=null; _fboW=0; _fboH=0;
+        _lostNotified=false;
+      }
 
       function getGL(w,h){
+        // Menetetty konteksti ei palaa samaan canvakseen ilman restored-tapahtumaa,
+        // joten vanha canvas heitetään pois ja luodaan uusi. Ohjelmat, puskurit ja
+        // tekstuurit kuuluvat menetettyyn kontekstiin, joten nekin luodaan uudelleen.
+        if(_gl && _gl.isContextLost()) resetGL();
         // Reuse a single canvas + context. Only resize when needed.
         if(!_glCanvas){
           _glCanvas=document.createElement('canvas');
+          _glCanvas.addEventListener('webglcontextlost',()=>{
+            console.warn('WebGL-konteksti menetettiin. Seuraava kutsu luo uuden kontekstin.');
+          });
         }
         if(_glCanvas.width!==w || _glCanvas.height!==h){
           _glCanvas.width=w; _glCanvas.height=h;
@@ -3927,6 +3948,37 @@
         // SRC_ALPHA-blendaus kertoisi värin alphalla ja korottaisi alphan toiseen potenssiin.
         _gl.disable(_gl.BLEND);
         return _gl;
+      }
+
+      // Tarkistetaan piirron jälkeen ennen to2D-kopiota. Jos konteksti menetettiin
+      // kesken passin, puskuri on tyhjä, ja kopio olisi hiljaa läpinäkyvä kuva.
+      function lostAfterDraw(gl, fallbackUsed){
+        if(_testLoseNext){
+          _testLoseNext=false;
+          const ext=gl.getExtension('WEBGL_lose_context');
+          if(ext) ext.loseContext();
+        }
+        if(!gl.isContextLost()) return false;
+        console.warn('WebGL-konteksti menetettiin kesken passin.');
+        if(fallbackUsed && !_lostNotified){
+          _lostNotified=true;
+          showToast('WebGL-konteksti menetettiin. Rasteri laskettiin varamenetelmällä.', 'warn');
+        }
+        return true;
+      }
+
+      // Testikoukku (tools/alpha_selainkoe.js). Ilman parametria menettää kontekstin heti,
+      // {kesken:true} menettää sen seuraavan passin piirron jälkeen. Palauttaa false,
+      // jos selain ei tue WEBGL_lose_context-laajennusta.
+      function _testLoseContext(opts){
+        // Menetetyn kontekstin getExtension palauttaa null, joten haetaan elävä konteksti.
+        const gl=(_gl && !_gl.isContextLost()) ? _gl : getGL(1,1);
+        if(!gl) return false;
+        const ext=gl.getExtension('WEBGL_lose_context');
+        if(!ext) return false;
+        if(opts&&opts.kesken){ _testLoseNext=true; return true; }
+        ext.loseContext();
+        return true;
       }
 
       function getProg(key,fsSrc){
@@ -4019,12 +4071,15 @@
         setUni(gl,prog,'u_shape',{i:shape||0});
         gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
         gl.deleteTexture(tex);
+        if(lostAfterDraw(gl,true)) return fallback(src,cell,angleDeg);
         return to2D(gl.canvas);
       }
 
       function baseHalftone(src, cell, angleDeg, density, dotScale, shape, maskSrc){
         const w=src.width, h=src.height;
-        const gl=getGL(w,h); if(!gl) return null;
+        // Pohjalle ei ole CPU-fallbackia, joten virhe heitetään eikä palauteta tyhjää.
+        const gl=getGL(w,h);
+        if(!gl) throw new Error('Pohjan rasteri vaatii WebGL:n, eikä sitä saatu käyttöön.');
         const prog=getProg('base',FS_BASE);
 
         // Render color mask to FBO if needed
@@ -4067,6 +4122,7 @@
         setUni(gl,prog,'u_useMask',{i:maskTex?1:0});
         gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
         gl.deleteTexture(srcTex);
+        if(lostAfterDraw(gl,false)) throw new Error('WebGL-konteksti menetettiin pohjan rasteroinnin aikana. Yritä uudelleen.');
         return to2D(gl.canvas);
       }
 
@@ -4084,6 +4140,7 @@
         setUni(gl,prog,'u_px',px);
         gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
         gl.deleteTexture(tex);
+        if(lostAfterDraw(gl,true)) return erodeCanvas(src,px);
         return to2D(gl.canvas);
       }
 
@@ -4135,7 +4192,7 @@
         return off;
       }
 
-      return { colorHalftone, baseHalftone, erode };
+      return { colorHalftone, baseHalftone, erode, _testLoseContext };
     })();
 
     // Julkiset rajapintafunktiot

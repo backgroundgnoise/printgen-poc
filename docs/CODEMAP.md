@@ -292,7 +292,8 @@ Vaihenumerot ovat 1, 2, 3, 4, 4.5, 5, 7, 7b ja 8. Vaihetta 6 ei ole.
 | `erode` (julkinen) | 4067–4082 |
 | `fallback` (CPU-värihalftone) | 4085–4109 |
 | `erodeCanvas` (CPU-erosion) | 4112–4130 |
-| Julkiset funktiot `{ colorHalftone, baseHalftone, erode }` | 4132 |
+| `resetGL`, `lostAfterDraw`, `_testLoseContext` (261104_012) | `getGL`in ympärillä |
+| Julkiset funktiot `{ colorHalftone, baseHalftone, erode, _testLoseContext }` | 4132 |
 
 ---
 
@@ -348,7 +349,7 @@ Vaihenumerot ovat 1, 2, 3, 4, 4.5, 5, 7, 7b ja 8. Vaihetta 6 ei ole.
 
 | # | CLAUDE.md sanoo | Koodi tekee |
 |---|---|---|
-| 5.1 | "WebGL engine … with CPU canvas fallbacks (`fallback`, `erodeCanvas`)" ja "WebGL-funktiot palauttavat AINA 2D-canvaksen" | `baseHalftone` palauttaa `null`, jos WebGL puuttuu (4021). Fallbackia ei ole. `exportFiles` antaa `null`in `computeUnionBBox`ille, ja `getContext` kaatuu. Seurauksena on toast "Vienti epäonnistui". `colorHalftone` ja `erode` noudattavat sääntöä. |
+| 5.1 | "WebGL engine … with CPU canvas fallbacks (`fallback`, `erodeCanvas`)" ja "WebGL-funktiot palauttavat AINA 2D-canvaksen" | `baseHalftone` palauttaa `null`, jos WebGL puuttuu (4021). Fallbackia ei ole. `exportFiles` antaa `null`in `computeUnionBBox`ille, ja `getContext` kaatuu. Seurauksena on toast "Vienti epäonnistui". `colorHalftone` ja `erode` noudattavat sääntöä. **[korjattu: 261104_012]** `baseHalftone` heittää selkeän virheen ("Pohjan rasteri vaatii WebGL:n…"), jonka vienti näyttää toastina. Esikatselu sieppaa virheen, ja pohja jää mustaksi. Fallbackia ei edelleenkään ole. |
 | 5.2 | Cmd/Ctrl+Z: `preventDefault()` aina, "kun fokus ei ole tekstikentässä" | Koodi ohittaa kaikki `INPUT`-elementit (2389): range, color, checkbox ja file. Kun slideria on juuri liikutettu, fokus on siinä, ja Cmd+Z menee selaimelle eikä wand-undoon. |
 | 5.3 | Magic wand: toleranssi "sama metriikka kuin eyedropperilla" | Metriikka on sama (euklidinen × 2.2, `<`), mutta **syöte eroaa**. Wand vertaa alkuperäisen kuvan pikseleihin (2410), eyedropper avaintaa värisäädetystä kuvasta (3051), ja sen näyte otetaan renderöidystä esikatselusta (2272). |
 | 5.4 | Sävysäädöt: "kanavakohtainen gamma laskee saturaatiota" | Gammasäätöä ei ole koodissa. Kanavittain tehdään lämpötila (+30/+5/−20), kirkkaus (additiivinen), kontrasti (keskipiste 128) ja posterize. Luminanssia (Rec.601, gamma-koodatusta sRGB:stä) käytetään vain saturaatiossa ja tritonessa (ks. 6.4). |
@@ -494,7 +495,12 @@ Vain arvio. Viitetiedoston rakenne CLAUDE.md:n mukaan: RGB + SMask, valkoinen om
 
   Vaikutus kohdistuu pisteiden antialias-reunoihin, kuvan reunoihin, halo-poistoon ja choke-passiin. Läpinäkymättömät pikselit eivät muutu.
 - **Tekstuurin `LINEAR`-suodatus sekoittaa suoraa alphaa [koe]. [korjattu: 261104_011]** `makeTex` käyttää `NEAREST`-suodatusta, joten näyte on aina yksi pikseli. Erosion lukee pikselikeskuksista, joten sen tulos ei muuttunut. Alkuperäinen havainto: `FS_COLOR` ottaa näytteen solun keskipisteestä, joka osuu yleensä pikselien väliin. Kuvan reunalla näyte sekoittuu läpinäkyvän (0,0,0,0) naapurin kanssa, jolloin reunan pisteen väri tummuu ja piste kasvaa. Koe 7 (`tools/alpha_selainkoe.js`): (200,100,50)-kiekon reunapisteistä 104/702 pikseliä poikkesi värisävyltään, enimmillään 55 yksikköä.
-- **Kontekstin menetystä ei käsitellä** (`webglcontextlost`). `_gl` jää viittaamaan kuolleeseen kontekstiin, eikä tuloksesta saa virhettä. Riski kasvaa suurissa vienneissä.
+- **Kontekstin menetystä ei käsitellä** (`webglcontextlost`). **[korjattu: 261104_012]** Kaksi tilannetta:
+  - Konteksti menetetään kutsujen välissä: `getGL` huomaa sen (`isContextLost`) ja luo uuden canvaksen ja kontekstin. Vanhaa ei yritetä palauttaa.
+  - Konteksti menetetään kesken passin: `lostAfterDraw` tarkistaa sen ennen `to2D`-kopiota. `colorHalftone` ja `erode` palauttavat CPU-fallbackin tuloksen ja näyttävät yhden toastin menetystä kohden. `baseHalftone` heittää virheen, koska sillä ei ole fallbackia.
+  - Testikoukku `_GL._testLoseContext()` (heti) ja `_GL._testLoseContext({kesken:true})` (seuraavan passin jälkeen) käyttää `WEBGL_lose_context`-laajennusta.
+
+  Alkuperäinen havainto: `_gl` jää viittaamaan kuolleeseen kontekstiin, eikä tuloksesta saa virhettä. Riski kasvaa suurissa vienneissä.
 - **`precision mediump float`** kaikissa fragment shadereissa. Pikselikoordinaatit ovat viennissä tuhansia (esim. 4252). Jos GPU toteuttaa mediumpin oikeana fp16:na (mobiili, mahdollisesti osa Safari/Metal-poluista), ruudukon tarkkuus on suurilla koordinaateilla luokkaa 2–4 px. Työpöytä-Chromessa mediump on yleensä käytännössä highp. **[päätelty]**
 - **Yksi jaettu GL-canvas ja -konteksti** muuttaa kokoaan jokaisen kutsun mukana (esikatselu ↔ vienti). Turvallisuus nojaa siihen, että jokainen julkinen funktio palauttaa `to2D`-kopion.
 - **Fallbackien erot:** `fallback` ja `erodeCanvas` tuottavat eri tuloksen kuin shaderit (ks. 6.2 ja 6.3). Pohjalle fallbackia ei ole (5.1).
@@ -572,6 +578,15 @@ Koe liitetään index.html:n konsoliin (ohje tiedoston alussa). Se tulostaa joka
 | 6 | `baseHalftone`, kaikki pikselit valkoisia | FAIL 176/176 harmaata | PASS 0/176 | PASS |
 | 7 | reunus: (200,100,50)-kiekon reunapisteiden sävy | FAIL 112/638, ero ≤ 118 | FAIL 104/702, ero ≤ 55 (`LINEAR`-suodatus, 8.1) | PASS 0/652, ero ≤ 2 |
 | 8 | kontekstin menetys | PUUTTUU | PUUTTUU | PUUTTUU |
+
+Kontekstin menetys (`261104_012`, testikoukku lisätty). Kohdat 1–7 kuten `NEAREST`-sarakkeessa, kaikki PASS.
+
+| # | Koe | Tulos |
+|---|---|---|
+| 8a | menetys kutsujen välissä → seuraava `baseHalftone` toimii | PASS (255,255,255,128) |
+| 8b | menetys kesken `colorHalftone`n → CPU-fallback ja toast, ei virhettä | PASS |
+| 8c | menetys kesken `baseHalftone`n → heittää virheen | PASS |
+| 8d | menetyksen jälkeen `baseHalftone` toimii taas | PASS (255,255,255,128) |
 
 Ajettu: Chromium 152. Safari: ei vielä ajettu.
 
