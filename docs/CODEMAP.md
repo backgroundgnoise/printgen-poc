@@ -4,6 +4,8 @@ Laadittu 2026-11-03 commitin `31c308f` pohjalta (`index.html`, 4616 riviä). Riv
 
 Dokumentti kuvaa nykytilan. Korjausehdotuksia siinä ei ole: suunnitelma tehdään erikseen tämän pohjalta.
 
+Myöhemmin korjatut kohdat on merkitty tunnuksella **[korjattu: commit]**. Alkuperäinen havainto jätetään näkyviin, jotta selainkokeiden lähtötaso on luettavissa.
+
 Merkinnät:
 - **[koe]**: varmistettu selainkokeella (Chromium 152, WebGL päällä, 2026-11-03).
 - **[päätelty]**: päätelty koodia lukemalla, ei ajettu.
@@ -278,7 +280,7 @@ Vaihenumerot ovat 1, 2, 3, 4, 4.5, 5, 7, 7b ja 8. Vaihetta 6 ei ole.
 | `FS_BASE` (pohjahalftone) | 3858–3880 |
 | `FS_ERODE` (erosion, maks. 8 px) | 3882–3900 |
 | Moduulin tila `_gl`, `_glCanvas`, `_progs`, `_buf`, `_fbo` | 3902 |
-| `getGL` (yksi jaettu konteksti, `BLEND` päälle) | 3904–3927 |
+| `getGL` (yksi jaettu konteksti; `BLEND` päällä, pois 261104_010) | 3904–3927 |
 | `getProg` | 3929–3938 |
 | `makeTex` (FLIP_Y) | 3940–3954 |
 | `setupQuad` | 3956–3963 |
@@ -399,7 +401,7 @@ Toteutus (`FS_ERODE` 3882–3900):
 - Kokonaispikselitarkkuus: viitteen 0,10 mm on 300 DPI:llä 1,18 px ja 600 DPI:llä 2,36 px.
 - **Kiinteä pohja** (kun `baseHalftoneOn` ei ole päällä, 3624–3632): RGB asetetaan valkoiseksi, jos alpha > 10, mutta **alpha säilyy** (reunat ovat puoliläpinäkyviä). Pikselit, joiden alpha ≤ 10, jäävät alkuperäisen värisiksi pohjatiedostoon.
 - Värikerrosta (`combinedCanvas`) ei kutisteta. Choke kohdistuu vain pohjaan, mikä on DTF:n oikea suunta.
-- Myös erosion-passi kulkee blendauksen läpi (ks. 8.1). **[koe]** Puoliläpinäkyvä pikseli RGBA (199,100,50,128) muuttui arvoon (100,52,24,64). Läpinäkymättömät pikselit säilyvät ennallaan.
+- Myös erosion-passi kulkee blendauksen läpi (ks. 8.1). **[koe]** Puoliläpinäkyvä pikseli RGBA (199,100,50,128) muuttui arvoon (100,52,24,64). Läpinäkymättömät pikselit säilyvät ennallaan. **[korjattu: 261104_010]** Pikseli säilyy arvossa (199,100,50,128).
 
 ### 6.3 Pohjan halftone: ruudukko ja kulma suhteessa värikerrokseen
 
@@ -428,14 +430,14 @@ Toteutus (`FS_ERODE` 3882–3900):
 
 - Kanavittainen leikkaus kirkkaudessa ja kontrastissa muuttaa sävyä (hue) ja saturaatiota lähellä ääripäitä. Mitään säätöä ei tehdä havaintopohjaisessa avaruudessa (esim. OKLab).
 - Halftone käyttää myös Rec.601-luminanssia gamma-koodatusta RGB:stä (`FS_COLOR` 3851).
-- **Sävyvaste rasterissa:** säde on `(1 − br) × maxSize`, joten peitto kasvaa neliöllisesti. **[koe]** Solusta 20×20 px harmaa 191 peitti 16 px (4 %), harmaa 128 peitti 60 px (15 %) ja musta 256 px (64 %). Dot gain -kompensaatiota tai tonaalista linearisointia ei ole.
+- **Sävyvaste rasterissa:** säde on `(1 − br) × maxSize`, joten peitto kasvaa neliöllisesti. **[koe]** Solusta 20×20 px harmaa 191 peitti 16 px (4 %), harmaa 128 peitti 60 px (15 %) ja musta 256 px (64 %). Blendauksen poiston jälkeen (261104_010) samalla mittarilla (alpha > 127) 16 / 68 / 268 px, koska pisteen antialias-reunan alpha ei enää korotu toiseen potenssiin. Neliöllinen sävyvaste ei muuttunut. Dot gain -kompensaatiota tai tonaalista linearisointia ei ole.
 - **Väripisteet ovat solun keskipisteen värisiä** (`gl_FragColor = col.rgb`), eli värikerroksen halftone ei ole kanavaerottelu vaan "värillinen AM". Valkoiset ja hyvin vaaleat alueet (br → 1) tuottavat pisteen nollakoolla, eli ne katoavat rasteroidusta yhdistetystä kuvasta.
 
 ### 6.5 Max dot
 
 - **Värikerros:** `halftoneMaxSize` (UI 10–100 → 0,10–1,00, oletus 0,92) on säde suhteessa puoleen solusta. Ympyrämuoto koskettaa naapuria arvolla 1,0 ja peittää solun kokonaan vasta noin arvolla 1,41, jota UI ei salli. Täysi sävy jättää siis aina aukkoja, oletuksella noin 34 %.
 - Muodot (`shapeDist`): 0 = ympyrä, 1 = ellipsi (y × 1,6), 2 = timantti (L1), 3 = viiva (|y| × 2,5). Sama `maxSize` tuottaa eri muodoilla eri peiton.
-- **Kanavaerottelu ei ole AM-rasteria.** `extractChannel` kirjoittaa mustan pikselin, jonka alpha on tiheys. Koska br = 0, `FS_COLOR` piirtää **joka soluun maksimikokoisen pisteen**, ja tiheys koodautuu pisteen läpinäkyvyyteen. **[koe]** Tiheyksillä 0,25 / 0,5 / 1,0 piste peitti aina 276/400 px. Keskipisteen alpha oli 16 / 64 / 255 eli tiheys², blendauksen vuoksi (8.1).
+- **Kanavaerottelu ei ole AM-rasteria.** `extractChannel` kirjoittaa mustan pikselin, jonka alpha on tiheys. Koska br = 0, `FS_COLOR` piirtää **joka soluun maksimikokoisen pisteen**, ja tiheys koodautuu pisteen läpinäkyvyyteen. **[koe]** Tiheyksillä 0,25 / 0,5 / 1,0 piste peitti aina 276/400 px. Keskipisteen alpha oli 16 / 64 / 255 eli tiheys², blendauksen vuoksi (8.1). **[korjattu: 261104_010]** Keskipisteen alpha on nyt 64 / 128 / 255 eli tiheys. Kanavaerottelu ei silti ole AM-rasteria.
 - **Pohja:** max dot = `density × dotScale` (oletus 0,704).
 
 ---
@@ -485,12 +487,13 @@ Vain arvio. Viitetiedoston rakenne CLAUDE.md:n mukaan: RGB + SMask, valkoinen om
 
 ### 8.1 WebGL-renderöinti
 
-- **Blendaus tuplaa alphan [koe].** `getGL` kytkee `gl.BLEND`in (`SRC_ALPHA, ONE_MINUS_SRC_ALPHA`) pysyvästi päälle (3924–3925), ja jokainen passi piirtää tyhjään (0,0,0,0) puskuriin. Tämän seurauksena jokaisessa WebGL-passissa puoliläpinäkyvän pikselin väri kerrotaan alphalla ja alpha korotetaan toiseen potenssiin. Kokeessa:
+- **Blendaus tuplaa alphan [koe]. [korjattu: 261104_010]** `getGL` kytkee blendauksen pois (`gl.disable(gl.BLEND)`), ja shaderin tulos kirjoitetaan puskuriin sellaisenaan. Alkuperäinen havainto: `getGL` kytkee `gl.BLEND`in (`SRC_ALPHA, ONE_MINUS_SRC_ALPHA`) pysyvästi päälle (3924–3925), ja jokainen passi piirtää tyhjään (0,0,0,0) puskuriin. Tämän seurauksena jokaisessa WebGL-passissa puoliläpinäkyvän pikselin väri kerrotaan alphalla ja alpha korotetaan toiseen potenssiin. Kokeessa:
   - erode: (199,100,50,128) → (100,52,24,64)
   - colorHalftone, musta alpha 128 → alpha 64
   - baseHalftone: valkoinen alpha 128 → (128,128,128,64), eli pohjatiedostoon tulee harmaata eikä valkoista
 
   Vaikutus kohdistuu pisteiden antialias-reunoihin, kuvan reunoihin, halo-poistoon ja choke-passiin. Läpinäkymättömät pikselit eivät muutu.
+- **Tekstuurin `LINEAR`-suodatus sekoittaa suoraa alphaa [koe].** `FS_COLOR` ottaa näytteen solun keskipisteestä, joka osuu yleensä pikselien väliin. Kuvan reunalla näyte sekoittuu läpinäkyvän (0,0,0,0) naapurin kanssa, jolloin reunan pisteen väri tummuu ja piste kasvaa. Koe 7 (`tools/alpha_selainkoe.js`): (200,100,50)-kiekon reunapisteistä 104/702 pikseliä poikkesi värisävyltään, enimmillään 55 yksikköä.
 - **Kontekstin menetystä ei käsitellä** (`webglcontextlost`). `_gl` jää viittaamaan kuolleeseen kontekstiin, eikä tuloksesta saa virhettä. Riski kasvaa suurissa vienneissä.
 - **`precision mediump float`** kaikissa fragment shadereissa. Pikselikoordinaatit ovat viennissä tuhansia (esim. 4252). Jos GPU toteuttaa mediumpin oikeana fp16:na (mobiili, mahdollisesti osa Safari/Metal-poluista), ruudukon tarkkuus on suurilla koordinaateilla luokkaa 2–4 px. Työpöytä-Chromessa mediump on yleensä käytännössä highp. **[päätelty]**
 - **Yksi jaettu GL-canvas ja -konteksti** muuttaa kokoaan jokaisen kutsun mukana (esikatselu ↔ vienti). Turvallisuus nojaa siihen, että jokainen julkinen funktio palauttaa `to2D`-kopion.
@@ -554,3 +557,20 @@ Ajettu selainpaneelissa (`file://…/index.html`, Chromium 152, WebGL käytöss�
 | `colorHalftone`, harmaa 191/128/0, alpha 255 | sävy | peitto (alpha > 127) 16/60/256 px / 400 |
 
 Safarilla kokeita ei ajettu.
+
+### Vaihe A1: toistettava koe `tools/alpha_selainkoe.js` (2026-11-04)
+
+Koe liitetään index.html:n konsoliin (ohje tiedoston alussa). Se tulostaa jokaisesta kohdasta PASS / FAIL / PUUTTUU. Toleranssi ±2 johtuu 2D-canvaksen premultiplied-tallennuksesta.
+
+| # | Koe | Lähtötaso (`ca3c6a9`) | Blendaus pois (`261104_010`) |
+|---|---|---|---|
+| 1 | `erode`, (200,100,50) alpha 128 | FAIL (100,52,24,64) | PASS (199,100,50,128) |
+| 2 | `erode`, alpha 255, sisäosa bitintarkka | PASS | PASS |
+| 3 | `colorHalftone`, musta alpha 64 / 128 / 255, keskus | FAIL 16 / 64 / 255 | PASS 64 / 128 / 255 |
+| 4 | `colorHalftone`, läpinäkymätön (200,100,50), sävy pisteiden reunoilla | FAIL 140/1582, ero ≤ 100 | PASS 0/1641, ero ≤ 2 |
+| 5 | `baseHalftone`, alpha 128, keskus | FAIL (128,128,128,64) | PASS (255,255,255,128) |
+| 6 | `baseHalftone`, kaikki pikselit valkoisia | FAIL 176/176 harmaata | PASS 0/176 |
+| 7 | reunus: (200,100,50)-kiekon reunapisteiden sävy | FAIL 112/638, ero ≤ 118 | FAIL 104/702, ero ≤ 55 (`LINEAR`-suodatus, 8.1) |
+| 8 | kontekstin menetys | PUUTTUU | PUUTTUU |
+
+Ajettu: Chromium 152. Safari: ei vielä ajettu.

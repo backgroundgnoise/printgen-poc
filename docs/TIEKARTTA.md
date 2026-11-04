@@ -109,6 +109,14 @@ Muut mittaukset tukevat samaa:
 
 **Valmis kun:** CODEMAPin liitteen selainkokeet antavat odotetut tulokset: alpha 128 pysyy arvossa 128 eikä putoa arvoon 64, ja pohjatiedoston puoliläpinäkyvät reunat ovat valkoisia eivätkä harmaita. Kokeet ajetaan Chromessa **ja Safarissa**.
 
+**Valittu ratkaisu (2026-11-04):** vaihtoehto A eli blendaus pois. Kaikki passit piirtävät tyhjään puskuriin, joten blendauksella ei ole tehtävää. Toteutus kolmena committina:
+
+1. Blendaus pois (`261104_010`). Korjaa alphan neliöinnin ja värin tummumisen. Tehty.
+2. Tekstuurin suodatus `NEAREST`. Korjaa kuvan reunan pisteiden tummumisen (CODEMAP 8.1).
+3. `webglcontextlost`-käsittely ja testikoukku `_GL._testLoseContext()`.
+
+Mittari: `tools/alpha_selainkoe.js` (CODEMAPin liite). Tulokset kirjataan liitteeseen jokaisen commitin jälkeen.
+
 ### Vaihe A2 — Rasterin sävyvaste ja rehelliset kartat
 
 **Miksi nyt:** Profiilin rajat (min dot, max LPI) mitataan pinta-alakorjatulla kartalla. Printgenin oma rasteri piirtää säde-kaavalla huomattavasti pienempiä pisteitä, joten rajat eivät päde sen vientiin ennen korjausta (luku 2, vaihe 0). Koeajon 2 contone vs. AM -vertailu tarvitsee myös korjatun rasterin.

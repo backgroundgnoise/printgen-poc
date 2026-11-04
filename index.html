@@ -3921,8 +3921,11 @@
         _gl.bindBuffer(_gl.ARRAY_BUFFER,_buf);
         // UV: UNPACK_FLIP_Y=true -> v=0 bottom, v=1 top of canvas
         _gl.bufferData(_gl.ARRAY_BUFFER,new Float32Array([-1,-1,0,0,1,-1,1,0,-1,1,0,1,1,1,1,1]),_gl.STATIC_DRAW);
-        _gl.enable(_gl.BLEND);
-        _gl.blendFunc(_gl.SRC_ALPHA,_gl.ONE_MINUS_SRC_ALPHA);
+        // Ei blendausta. Jokainen passi tyhjentää puskurin ja piirtää yhden koko ruudun
+        // nelikulmion, joten yhdistettävää ei ole. Puskuri säilyttää suoran alphan
+        // (premultipliedAlpha:false), ja shaderin tulos kirjoitetaan sellaisenaan.
+        // SRC_ALPHA-blendaus kertoisi värin alphalla ja korottaisi alphan toiseen potenssiin.
+        _gl.disable(_gl.BLEND);
         return _gl;
       }
 
