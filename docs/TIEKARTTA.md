@@ -14,7 +14,7 @@ Merkinnät:
 
 CODEMAPin keskeiset löydökset:
 
-1. WebGL-blendaus korottaa alphan toiseen potenssiin jokaisessa passissa, ja pohjan reunat harmaantuvat. [vahvistettu]
+1. WebGL-blendaus korottaa alphan toiseen potenssiin jokaisessa passissa, ja pohjan reunat harmaantuvat. [vahvistettu] Korjattu vaiheessa A1.
 2. Rasterin säde on verrannollinen tummuuteen, joten peitto kasvaa neliöllisesti: keskiharmaa peittää noin 15 %. [vahvistettu]
 3. Max dot 0,92 on säde, joten täysi sävy peittää noin 66 %. [vahvistettu]
 4. Kanavaerottelu ei ole AM-rasteria, koska tiheys koodautuu alphaan. [vahvistettu]
@@ -117,6 +117,12 @@ Muut mittaukset tukevat samaa:
 
 Mittari: `tools/alpha_selainkoe.js` (CODEMAPin liite). Tulokset kirjataan liitteeseen jokaisen commitin jälkeen.
 
+**Tila:** Chromium 152:ssa kaikki 13 kohtaa PASS. Vaihe on valmis, kun sama koe on ajettu Safarissa ja tulos kirjattu CODEMAPin liitteeseen.
+
+**Milloin vaihtoehto B (premultiplied-malli) tulee ajankohtaiseksi:**
+- Jos halftone siirtyy solun keskiarvon näytteistykseen (yhden keskipisteen näytteen sijaan), keskiarvo on laskettava premultiplied-avaruudessa. Suoran alphan keskiarvossa läpinäkyvät (0,0,0,0) pikselit tummentavat reunasolujen värin samalla tavalla kuin `LINEAR`-suodatus teki ennen A1:tä.
+- Jos jokin passi alkaa yhdistää useita kerroksia samaan GPU-puskuriin (blendaus oikeasti tarpeen).
+
 ### Vaihe A2 — Rasterin sävyvaste ja rehelliset kartat
 
 **Miksi nyt:** Profiilin rajat (min dot, max LPI) mitataan pinta-alakorjatulla kartalla. Printgenin oma rasteri piirtää säde-kaavalla huomattavasti pienempiä pisteitä, joten rajat eivät päde sen vientiin ennen korjausta (luku 2, vaihe 0). Koeajon 2 contone vs. AM -vertailu tarvitsee myös korjatun rasterin.
@@ -128,6 +134,7 @@ Mittari: `tools/alpha_selainkoe.js` (CODEMAPin liite). Tulokset kirjataan liitte
 - LPI-kvantisointi näkyviin: UI ja kartat näyttävät todellisen LPI:n (`300 / round(300/LPI)`), ei pyydettyä.
 - Pohjan solun alkuarvo korjataan vastaamaan slideria (`baseHalftoneCell` 10 px vs. 45 LPI).
 - Värikerroksen ja pohjan oletuskulma yhtenäistetään, tai ero perustellaan.
+- **Pohjan reunan alpha-vaste päätetään pistekaavan korjauksen yhteydessä.** `FS_BASE` käyttää reunan alphaa kahdesti: pisteen säde ∝ alpha (pinta-ala ∝ a²) ja pisteen peittävyys × alpha. Kokonaisvaste on siis noin a³. A1:ssä tätä ei muutettu (ennen A1:tä blendaus nosti vasteen noin a⁴:ään). Päätettävä: mikä vaste on tarkoituksellinen, kun pisteen koko muuttuu pinta-alakorjatuksi.
 
 **Valmis kun:** Selainkokeessa harmaa 128 peittää noin 50 % solusta, ja kartan jokaisen sarakkeen mitattu peitto vastaa otsikkoaan ±2 %-yksikön tarkkuudella. Generaattorin osalta mittari on `python3 tools/kalibrointikartat.py --tarkista`, jonka suurin poikkeama on nyt 5,2 %-yksikköä (90 %, 75 LPI).
 
@@ -227,4 +234,4 @@ Jokaisesta filmistä kirjataan RIPin asetukset ennen ajoa.
 - Gamma-ongelma koski toisen tahon presetiä, ei Printgeniä.
 - Max dot 90 % on kumppanin **pinta-ala**arvo, ei säde.
 
-Korjataan vaiheen A1 yhteydessä.
+Korjattu vaiheen A1 yhteydessä (2026-11-04). Samalla lisättiin A1:n säännöt (ei blendausta, `NEAREST`, pohjan virhe) kriittisiin arkkitehtuurisääntöihin.

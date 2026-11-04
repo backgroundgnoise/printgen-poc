@@ -49,7 +49,8 @@ Alla oleva osa on kirjoitettu keskusteluissa tehtyjen päätösten pohjalta. Koo
 
 ## Kriittiset arkkitehtuurisäännöt
 
-- **WebGL-funktiot palauttavat AINA 2D-canvaksen** (`to2D`-kopio ennen returnia). Downstream (`getImageData`, CMYK, kanavaerottelu) olettaa 2D-canvaksen.
+- **WebGL-funktiot palauttavat AINA 2D-canvaksen** (`to2D`-kopio ennen returnia). Downstream (`getImageData`, CMYK, kanavaerottelu) olettaa 2D-canvaksen. Poikkeus: `baseHalftone`lla ei ole CPU-fallbackia, joten se heittää virheen (ei WebGL:ää tai konteksti menetetty kesken passin) eikä palauta `null`ia.
+- **WebGL-passit eivät käytä blendausta.** Jokainen passi piirtää tyhjään puskuriin, ja puskuri on suora alpha (`premultipliedAlpha:false`). Blendaus neliöisi alphan (128 → 64). Tekstuurit ovat `NEAREST`, koska `LINEAR` sekoittaa suoraa alphaa ja tummentaa kuvan reunan pisteet. Tarkistus: `tools/alpha_selainkoe.js`.
 - **Cmd/Ctrl+Z:** `preventDefault()` kutsutaan aina, kun fokus ei ole tekstikentässä, vaikka undo-pino olisi tyhjä. Muuten selain saa pikanäppäimen ja voi nollata sivun tilan.
 - **Magic wand** vertaa aina lähtöpikseliin (ennustettavuus). Toleranssi = RGB-euklidinen etäisyys × 2.2, sama metriikka kuin eyedropperilla. Klikkauksen koordinaattimuunnos huomioi, että kuva piirretään keskitettynä 86 %:n alueelle, ei koko canvakselle.
 - **Pohjakerros** on alpha-pohjainen: pisteen koko = density × dotScale × alpha, jotta valkoinen ei vuoda reunoilla.
@@ -84,8 +85,8 @@ Kumppanin tuotannossa toimiva viitetiedostorakenne: RGB + SMask, valkoinen omana
 - **DPI:** vienti on kovakoodattu 300 DPI:hin (`cellPx = Math.round(300 / LPI)`). Viitestandardi on 600 DPI. 300 DPI:ssä 0.25 mm:n min dot on ~3 px ja 0.05 mm:n choke alle pikselin.
 - **Choke:** nykyinen erosion toimii kokonaisina pikseleinä. Vaihtoehto: laske choke halftone-shaderissa analyyttisesti (valkoisen pisteen säde = värisäde − choke), jolloin se on alipikselitarkka. Vakiochoke syö pieniä pisteitä suhteessa enemmän (50 %:n sävyssä valkoisen peitto 64 % / 57 % / 50 % LPI:llä 20 / 25 / 30).
 - **Pohjan rekisteröinti:** tarkista, käyttääkö pohjan halftone samaa ruudukkoa ja kulmaa kuin värikerros. Viitestandardissa molemmilla on sama kulma.
-- **Sävysäädöt:** kanavakohtainen gamma laskee saturaatiota. Sävysäädöt pitäisi tehdä luminanssille (esim. OKLab), jolloin sävy ja kroma säilyvät.
-- **Max dot:** 90 % jättää täysiin sävyihin tummat reiät. Kuuluu intentiin (rasteri-ilme).
+- **Sävysäädöt:** Printgenissä ei ole gammasäätöä. Gamma-ongelma koski toisen tahon presetiä. Printgenin kirkkaus ja kontrasti tehdään kuitenkin kanavittain, mikä muuttaa sävyä ja saturaatiota ääripäissä (CODEMAP 6.4). Suunta on edelleen luminanssipohjainen säätö (esim. OKLab).
+- **Max dot:** kumppanin 90 % on **pinta-ala**. Printgenin `halftoneMaxSize` (0,92) on säde, joten täysi sävy peittää vain noin 66 % (CODEMAP 5.5). Korjataan vaiheessa A2. Max dot kuuluu intentiin (rasteri-ilme).
 - **LPI-tasot:** ehdotus 20 (tyyli) ja 25 (detalji), 30 pois. Ei vielä vahvistettu samalla aineistolla.
 - **Kompaktit alueet** (logot, tasaiset värit): contone + epätasainen valkoinen pohja (esim. 85–100 %, kohinamoduloitu, kiinteä siemen toistettavuutta varten). Riippuu siitä, tulkitseeko RIP valkoisen kanavan harmaat suhteellisena peittona. Selvitetään porraskiilatestillä.
 - **Recipe-valmius:** osa asetuksista asuu DOM-kentissä eikä `state`-objektissa. Ennen recipe-sarjallistamista tarvitaan yksi totuuden lähde.
