@@ -98,7 +98,7 @@ Muut mittaukset tukevat samaa:
 
 **Koodimuutoksia ei tehdä.**
 
-### Vaihe A1 — Alpha ja blendaus
+### Vaihe A1 — Alpha ja blendaus (valmis)
 
 **Miksi ensin:** Pieni muutos, joka koskee kaikkea vientiä. PDF-reitti kuljettaa contone-alphan SMaskeina, joten se ei voi olla oikein ennen tätä.
 
@@ -117,7 +117,7 @@ Muut mittaukset tukevat samaa:
 
 Mittari: `tools/alpha_selainkoe.js` (CODEMAPin liite). Tulokset kirjataan liitteeseen jokaisen commitin jälkeen.
 
-**Tila:** Chromium 152:ssa kaikki 13 kohtaa PASS. Vaihe on valmis, kun sama koe on ajettu Safarissa ja tulos kirjattu CODEMAPin liitteeseen.
+**Tila: valmis (2026-11-04).** Kaikki 13 kohtaa PASS sekä Chromium 152:ssa että Safari 27.2:ssa (CODEMAPin liite).
 
 **Milloin vaihtoehto B (premultiplied-malli) tulee ajankohtaiseksi:**
 - Jos halftone siirtyy solun keskiarvon näytteistykseen (yhden keskipisteen näytteen sijaan), keskiarvo on laskettava premultiplied-avaruudessa. Suoran alphan keskiarvossa läpinäkyvät (0,0,0,0) pikselit tummentavat reunasolujen värin samalla tavalla kuin `LINEAR`-suodatus teki ennen A1:tä.
@@ -199,12 +199,12 @@ Vastaukset kirjataan lukuun 7. Kohdat 1–3 ratkaisevat vaiheen C laajuuden ja 6
 ```
 Vaihe 0 (valmis) ──► koeajon 1 tulkinta
 A2 ──► (koeajo 2) ──► D
-A1 ──────────────────────────────► C
+A1 (valmis) ────────────────────► C
 Selvitys ──► C:n laajuus, E:n tarve
 B ───────────────────────────────► C
 ```
 
-Vaihe 0 on valmis: koeajon 1 kynnykset ovat pinta-alapeittoa, eikä niiden tulkinta odota A2:ta. A1 ja A2 voidaan aloittaa heti. Selvitys kulkee koko ajan taustalla.
+Vaihe 0 on valmis: koeajon 1 kynnykset ovat pinta-alapeittoa, eikä niiden tulkinta odota A2:ta. A1 on valmis (2026-11-04). A2 voidaan aloittaa heti. Selvitys kulkee koko ajan taustalla.
 
 ## 6. Seuraava koeajo
 

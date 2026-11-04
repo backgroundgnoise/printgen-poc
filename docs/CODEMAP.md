@@ -588,6 +588,8 @@ Kontekstin menetys (`261104_012`, testikoukku lisätty). Kohdat 1–7 kuten `NEA
 | 8c | menetys kesken `baseHalftone`n → heittää virheen | PASS |
 | 8d | menetyksen jälkeen `baseHalftone` toimii taas | PASS (255,255,255,128) |
 
-Ajettu: Chromium 152. Safari: ei vielä ajettu.
+Ajettu: Chromium 152 ja Safari 27.2 (macOS, WebKit 605.1.15; käyttäjän ajo 2026-11-04, commit `261104_013`). Safarissa kaikki 13 kohtaa PASS samoilla arvoilla. Ainoa ero on kohdan 7 näytteen koko: 676 pikseliä, joiden alpha ≥ 64 (Chromium 652). Ero johtuu todennäköisesti kiekon antialiasoinnista 2D-canvaksella, ja värisävy oli molemmissa oikea (suurin ero 2).
+
+Safarissa `premultipliedAlpha:false`-canvaksen kopio `drawImage`lla 2D-canvakselle toimii oikein, joten `readPixels`-varasuunnitelmaa ei tarvita. Myös `WEBGL_lose_context` on tuettu.
 
 Sävyvasteen peitto (6.4, alpha > 127) ei muuttunut `NEAREST`-suodatuksesta: 16 / 68 / 268 px.
