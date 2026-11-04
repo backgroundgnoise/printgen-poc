@@ -34,7 +34,40 @@ CODEMAPin keskeiset löydökset:
 | Kuvien 5 ja 6 filmi on sävyltään käänteinen. | [oletus] pelkkä valkoinen kanava | Ei tulkita ennen kuin asetukset on vahvistettu. |
 | Ruudukko aaltoilee. | [vahvistettu] | Johtuu kankaan ja filmin asettumisesta. Kohdistusta ei lueta näistä kuvista. |
 
-**Varaus:** karttageneraattorin pistekaavaa ei ole tarkistettu. Jos kartta käyttää samaa säde ∝ tummuus -kaavaa kuin shader, sarakeotsikot (5–90 %) eivät vastaa todellista peittoa, ja yllä olevat prosenttikynnykset on laskettava uudelleen. Tämä tarkistetaan ensimmäisenä (vaihe 0).
+**Varaus (ratkaistu vaiheessa 0, ks. alla):** karttageneraattorin pistekaavaa ei ollut tarkistettu. Jos kartta olisi käyttänyt samaa säde ∝ tummuus -kaavaa kuin shader, sarakeotsikot (5–90 %) eivät vastaisi todellista peittoa.
+
+### Vaihe 0: kartan pistekaava (selvitetty 2026-11-04)
+
+**Johtopäätös: koeajon prosenttikynnykset ovat käyttökelpoisia sellaisenaan.** Kartan "5 %" tarkoittaa noin 5 %:n pinta-alapeittoa, ei sädettä. [vahvistettu] tuloste-mittaus
+
+**Miten selvitettiin.** Karttageneraattorin lähdekoodia ei löytynyt repositoriosta, sen historiasta eikä koeajon tiedostoista. Kaava pääteltiin mittaamalla max-LPI-haitarin paitaskannauksesta (600 DPI): pisteväli autokorrelaatiolla, fyysinen piste kynnysarvolla (puoliväli kankaan ja musteen välillä), lisäksi keskitummuudesta Murray–Davies-peitto. Kartan alateksti kertoo, että se on erillinen profiilin `raster.maxLpi`-mittaustyökalu, joka viittaa Printgeniin "työkaluna" (Printgen kvantisoi solun 300 DPI:hin, portaat 25, 30, 33, 38, 43, 50, 60, 75). Kartta ei siis ole Printgenin vientiä. [päätelty]
+
+**Laskelma 25 LPI:llä** (solu 25,4 / 25 = 1,016 mm):
+
+| Sarake | Säde ∝ tummuus (Printgenin shader, max 0,92) | Pinta-ala ∝ tummuus | Mitattu paidalta |
+|---|---|---|---|
+| 5 % | Ø 0,047 mm, peitto 0,17 % | Ø 0,256 mm, peitto 5 % | Ø ≈ 0,27 mm (epätarkka, kankaan rakenne häiritsee) |
+| 15 % | Ø 0,140 mm, peitto 1,5 % | Ø 0,444 mm, peitto 15 % | Ø ≈ 0,46 mm, peitto ≈ 17 % |
+
+Kaavat: säde-tulkinnassa Ø = t × 0,92 × solu, pinta-alatulkinnassa Ø = solu × √(4t / π).
+
+Muut mittaukset tukevat samaa:
+- 25 LPI:n 30 %:n ja 50 %:n sarakkeiden fyysinen peitto oli 33 % ja 55 %. Pinta-alamalli antaa 30 % ja 50 %, säde-malli 6 % ja 17 %.
+- 15 %:n pisteen halkaisija suhteessa soluun oli 0,45 / 0,44 / 0,45 riveillä 25 / 30 / 35 LPI. Pinta-alamalli antaa 0,437, säde-malli 0,138.
+- Ero mallien välillä on peitossa noin kymmenkertainen, joten johtopäätös ei riipu mittaustarkkuudesta. Fyysisessä peitossa näkyy painon dot gain (+2–5 %-yksikköä). Murray–Davies-peitto on suurempi (15 % → noin 29 %, 50 % → 73–79 %), koska siihen sisältyy myös kankaan optinen dot gain.
+
+**Seuraukset:**
+- Kynnykset luetaan pinta-alapeittona. Pisteen halkaisija pinta-alamallilla:
+
+  | LPI | 25 | 30 | 35 | 40 | 45 | 50 | 55 | 60 |
+  |---|---|---|---|---|---|---|---|---|
+  | 5 % | 0,26 | 0,21 | 0,18 | 0,16 | 0,14 | 0,13 | 0,12 | 0,11 mm |
+  | 15 % | 0,44 | 0,37 | 0,32 | 0,28 | 0,25 | 0,22 | 0,20 | 0,19 mm |
+
+- Häviörajat osuvat samaan pistekokoon. 5 % katosi lähes kokonaan, mutta 25 ja 30 LPI:llä (Ø 0,26 / 0,21 mm) jäi hajanaisia pisteitä. 15 % katosi noin 50 LPI:stä ylöspäin (Ø 0,22 mm). Raja on noin 0,22–0,25 mm:n pisteessä, mikä vastaa kumppanin min dotia 0,25 mm. [päätelty]
+- Luvun 3 lause "kalibrointikartat on tehty samalla moottorilla kuin tuotanto" ei pidä tämän kartan osalta. Printgenin oma vienti piirtäisi samalla 15 %:n syötteellä 25 LPI:llä 0,14 mm:n pisteen, eli selvästi häviörajan alle. 5 %:n piste (Ø 0,047 mm ≈ 0,55 px 300 DPI:llä) ei piirry lainkaan.
+- Vaihe A2 on edelleen tarpeen tuotantorasterin vuoksi, mutta koeajon datan tulkinta ei odota sitä.
+- Generaattorin lähdekoodi kannattaa tallentaa, jotta seuraavan kartan kaava voidaan tarkistaa koodista eikä tulosteesta.
 
 ## 3. Periaatteet, jotka ohjaavat järjestystä
 
